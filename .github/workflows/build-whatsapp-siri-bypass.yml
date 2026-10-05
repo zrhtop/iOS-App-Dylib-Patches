@@ -1,0 +1,37 @@
+name: Build WhatsApp Siri Bypass
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "src/tweaks/whatsapp/WhatsAppDisableSiriEntitlement.m"
+      - "CMakeLists.txt"
+      - ".github/workflows/build-whatsapp-siri-bypass.yml"
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Configure
+        run: cmake -S . -B build-cmake -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build WhatsApp Siri bypass
+        run: cmake --build build-cmake --target WhatsAppDisableSiriEntitlement --config Release
+
+      - name: Verify output
+        run: |
+          file build/WhatsAppDisableSiriEntitlement.dylib
+          ls -lh build/WhatsAppDisableSiriEntitlement.dylib
+
+      - name: Upload dylib
+        uses: actions/upload-artifact@v4
+        with:
+          name: WhatsAppDisableSiriEntitlement
+          path: build/WhatsAppDisableSiriEntitlement.dylib
+          if-no-files-found: error
