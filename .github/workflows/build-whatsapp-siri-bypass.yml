@@ -5,7 +5,6 @@ on:
   push:
     paths:
       - "src/tweaks/whatsapp/WhatsAppDisableSiriEntitlement.m"
-      - "src/utils.h"
       - ".github/workflows/build-whatsapp-siri-bypass.yml"
 
 jobs:
@@ -16,21 +15,36 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Prepare standalone source
+        shell: bash
+        run: |
+          set -euxo pipefail
+          grep -v '#import "utils.h"' src/tweaks/whatsapp/WhatsAppDisableSiriEntitlement.m > WhatsAppDisableSiriEntitlement.build.m
+          cat >> WhatsAppDisableSiriEntitlement.build.m <<'EOF'
+
+          __attribute__((constructor))
+          static void WhatsAppDisableSiriEntitlementConstructor(void) {
+              init();
+          }
+          EOF
+
       - name: Build WhatsApp Siri bypass
         shell: bash
         run: |
           set -euxo pipefail
           SDKROOT="$(xcrun --sdk iphoneos --show-sdk-path)"
-          xcrun --sdk iphoneos clang             -target arm64-apple-ios16.0             -isysroot "$SDKROOT"             -dynamiclib             -fobjc-arc             -fblocks             -Isrc             -framework Foundation             -framework UIKit             -Wl,-install_name,@rpath/WhatsAppDisableSiriEntitlement.dylib             src/tweaks/whatsapp/WhatsAppDisableSiriEntitlement.m             -o WhatsAppDisableSiriEntitlement.dylib
+          xcrun --sdk iphoneos clang             -target arm64-apple-ios16.0             -isysroot "$SDKROOT"             -dynamiclib             -fobjc-arc             -fblocks             -framework Foundation             -framework UIKit             -Wl,-install_name,@rpath/WhatsAppDisableSiriEntitlement.dylib             WhatsAppDisableSiriEntitlement.build.m             -o WhatsAppDisableSiriEntitlement.dylib
 
       - name: Ad-hoc sign dylib
         run: codesign -f -s - WhatsAppDisableSiriEntitlement.dylib
 
       - name: Verify output
+        shell: bash
         run: |
+          set -euxo pipefail
           file WhatsAppDisableSiriEntitlement.dylib
           ls -lh WhatsAppDisableSiriEntitlement.dylib
-          nm -gU WhatsAppDisableSiriEntitlement.dylib | grep " _init$" || true
+          codesign -dv --verbose=2 WhatsAppDisableSiriEntitlement.dylib 2>&1 || true
 
       - name: Upload dylib
         uses: actions/upload-artifact@v4
