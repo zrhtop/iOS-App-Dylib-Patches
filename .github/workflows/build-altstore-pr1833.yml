@@ -1,0 +1,107 @@
+name: Build AltStore Classic 2.3 with PR1833 (unsigned IPA)
+
+on:
+  push:
+    branches:
+      - build/altstore-80045-20261015
+    paths:
+      - '.github/workflows/build-altstore-pr1833.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unsigned-ipa:
+    name: Build PR1833 on Xcode 27
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - name: Checkout AltStore PR #1833 (pinned)
+        uses: actions/checkout@v6
+        with:
+          repository: altstoreio/AltStore
+          ref: refs/pull/1833/head
+          submodules: recursive
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify upstream revision and Xcode version
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='85a5b9645328982e52b0fbf698e83412efb6e2da'
+          actual="$(git rev-parse HEAD)"
+          echo "Upstream commit: $actual"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::PR updated since this package was created. Review changes before rebuilding."
+            exit 1
+          fi
+          xcodebuild -version
+          git submodule status
+
+      - name: Repack legacy libcurl archive for Xcode 27
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive='Dependencies/libcurl/libcurl.a'
+          if [ -f "$archive" ]; then
+            echo 'Repacking libcurl.a to resolve Xcode 27 archive-member alignment.'
+            xcrun libtool -static -o "${archive}.repacked" "$archive"
+            test -s "${archive}.repacked"
+            mv -f "${archive}.repacked" "$archive"
+          else
+            echo "::error::Expected $archive not found."
+            exit 1
+          fi
+
+      - name: Compile unsigned iPhoneOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace AltStore.xcworkspace \
+            -scheme AltStore \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/altstore-derived" \
+            IPHONEOS_DEPLOYMENT_TARGET=17.4 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            'CODE_SIGN_IDENTITY=' \
+            build 2>&1 | tee "$RUNNER_TEMP/altstore-xcodebuild.log"
+
+      - name: Package unsigned IPA for LiveContainer testing
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/altstore-derived/Build/Products/Release-iphoneos/AltStore.app"
+          if [ ! -d "$app" ]; then
+            echo "::error::AltStore.app was not produced."
+            exit 1
+          fi
+          test -f "$app/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist"
+          mkdir -p "$RUNNER_TEMP/altstore-ipa/Payload"
+          ditto "$app" "$RUNNER_TEMP/altstore-ipa/Payload/AltStore.app"
+          (cd "$RUNNER_TEMP/altstore-ipa" && /usr/bin/zip -q -r "$GITHUB_WORKSPACE/AltStore-Classic-2.3-PR1833-unsigned.ipa" Payload)
+          ls -lh AltStore-Classic-2.3-PR1833-unsigned.ipa
+          unzip -tq AltStore-Classic-2.3-PR1833-unsigned.ipa | tail -1
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: AltStore-Classic-2.3-PR1833-unsigned
+          path: AltStore-Classic-2.3-PR1833-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build log for troubleshooting
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AltStore-PR1833-build-log
+          path: ${{ runner.temp }}/altstore-xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 7
