@@ -94,6 +94,24 @@ jobs:
           echo "Rebuilt library architectures:"
           xcrun lipo -info Dependencies/libcurl/libcurl.a
           xcrun lipo -archs Dependencies/libcurl/libcurl.a
+      - name: Preserve manually entered UDID when guest bundle has none
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("AltStore/AppDelegate.swift")
+          src = p.read_text()
+          old = "UserDefaults.shared.deviceID = Bundle.main.object(forInfoDictionaryKey: Bundle.Info.deviceID) as? String"
+          assert src.count(old) == 1, "AppDelegate UDID assignment changed upstream; review before patching"
+          new = """if let bundledDeviceID = Bundle.main.object(forInfoDictionaryKey: Bundle.Info.deviceID) as? String, !bundledDeviceID.isEmpty
+                  {
+                      UserDefaults.shared.deviceID = bundledDeviceID
+                  }"""
+          p.write_text(src.replace(old, new))
+          print("Installed guest-safe UDID persistence patch")
+          PY
+
       - name: Compile unsigned iPhoneOS app
         shell: bash
         run: |
@@ -135,6 +153,14 @@ jobs:
           # LiveContainer cannot register app extensions. Remove them only from the experimental guest build.
           guest="$RUNNER_TEMP/ipa-livecontainer/Payload/AltStore.app"
           rm -rf "$guest/PlugIns" "$guest/Watch" "$guest/WatchKitSupport"
+          # A guest in LiveContainer cannot assume AltStore's app-group entitlement or the
+          # sample device UDID embedded in the upstream Xcode project's Info.plist.
+          # Without ALTDeviceID, PR1835 prompts for the real UDID and persists it in UserDefaults.
+          /usr/libexec/PlistBuddy -c 'Delete :ALTAppGroups' "$guest/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Delete :ALTDeviceID' "$guest/Info.plist"
+          /usr/libexec/PlistBuddy -c 'Delete :ALTServerID' "$guest/Info.plist"
+          ! /usr/libexec/PlistBuddy -c 'Print :ALTDeviceID' "$guest/Info.plist" >/dev/null 2>&1
+          ! /usr/libexec/PlistBuddy -c 'Print :ALTAppGroups' "$guest/Info.plist" >/dev/null 2>&1
           # No entitlement bypass is claimed. This only removes unsupported guest targets.
           test -f "$guest/$execname"
           (cd "$RUNNER_TEMP/ipa-standard" && /usr/bin/zip -q -r "$GITHUB_WORKSPACE/AltStore-Classic-2.3-PR1835-unsigned.ipa" Payload)
