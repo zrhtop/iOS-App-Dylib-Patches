@@ -1,0 +1,171 @@
+name: Build AltStore Classic 2.3 PR1835 for LiveContainer (unsigned IPA)
+
+on:
+  push:
+    branches:
+      - build/altstore-pr1835-livecontainer-20261017
+    paths:
+      - '.github/workflows/build-altstore-pr1835-livecontainer.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unsigned-ipa:
+    name: Build PR1835 on Xcode 27
+    runs-on: xcode-27
+    timeout-minutes: 60
+    steps:
+      - name: Checkout AltStore PR #1835 (pinned)
+        uses: actions/checkout@v6
+        with:
+          repository: altstoreio/AltStore
+          ref: refs/pull/1835/head
+          submodules: recursive
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Verify upstream revision and Xcode version
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='22f766d2edb47626a082a1f775649bcf3fc43aff'
+          actual="$(git rev-parse HEAD)"
+          echo "Upstream commit: $actual"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::PR updated since this package was created. Review changes before rebuilding."
+            exit 1
+          fi
+          xcodebuild -version
+          git submodule status
+
+      - name: Build iOS arm64 libcurl (upstream archive is i386/armv7 only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "Original archive architectures:"
+          xcrun lipo -info Dependencies/libcurl/libcurl.a
+
+          # Use already-vendored OpenSSL from PR1835's AltSign submodule.
+          ossl="Dependencies/AltSign/Dependencies/OpenSSL/Frameworks/OpenSSL.xcframework/ios-arm64/OpenSSL.framework"
+          test -f "$ossl/OpenSSL"
+          test -f "$ossl/Headers/ssl.h"
+          file "$ossl/OpenSSL"
+          xcrun lipo -info "$ossl/OpenSSL" || true
+          prefix="$RUNNER_TEMP/openssl-ios"
+          mkdir -p "$prefix/lib" "$prefix/include/openssl"
+          cp -R "$ossl/Headers/." "$prefix/include/openssl/"
+          cp "$ossl/OpenSSL" "$prefix/lib/libssl.a"
+          cp "$ossl/OpenSSL" "$prefix/lib/libcrypto.a"
+
+          # Compile libcurl for the device arm64 ABI (not macOS arm64).
+          curl -fL --retry 3 --connect-timeout 20 \
+            "https://curl.se/download/curl-8.22.0.tar.xz" \
+            -o "$RUNNER_TEMP/curl-8.22.0.tar.xz"
+          tar -xf "$RUNNER_TEMP/curl-8.22.0.tar.xz" -C "$RUNNER_TEMP"
+          cmake -S "$RUNNER_TEMP/curl-8.22.0" -B "$RUNNER_TEMP/curl-ios-build" \
+            -DCMAKE_SYSTEM_NAME=iOS \
+            -DCMAKE_OSX_SYSROOT="$(xcrun --sdk iphoneos --show-sdk-path)" \
+            -DCMAKE_OSX_ARCHITECTURES=arm64 \
+            -DCMAKE_OSX_DEPLOYMENT_TARGET=17.4 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DBUILD_CURL_EXE=OFF \
+            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_STATIC_LIBS=ON \
+            -DBUILD_TESTING=OFF \
+            -DCURL_USE_OPENSSL=ON \
+            -DOPENSSL_ROOT_DIR="$prefix" \
+            -DOPENSSL_INCLUDE_DIR="$prefix/include" \
+            -DOPENSSL_SSL_LIBRARY="$prefix/lib/libssl.a" \
+            -DOPENSSL_CRYPTO_LIBRARY="$prefix/lib/libcrypto.a" \
+            -DCURL_USE_LIBPSL=OFF \
+            -DCURL_USE_LIBSSH2=OFF \
+            -DUSE_LIBIDN2=OFF \
+            -DUSE_NGHTTP2=OFF \
+            -DCURL_ZLIB=OFF \
+            -DCURL_ZSTD=OFF \
+            -DCURL_DISABLE_LDAP=ON \
+            -DCURL_DISABLE_LDAPS=ON
+          cmake --build "$RUNNER_TEMP/curl-ios-build" --target libcurl_static --parallel 6
+          built="$(find "$RUNNER_TEMP/curl-ios-build" -name libcurl.a -type f | head -1)"
+          test -n "$built" && test -s "$built"
+          cp "$built" Dependencies/libcurl/libcurl.a
+          echo "Rebuilt library architectures:"
+          xcrun lipo -info Dependencies/libcurl/libcurl.a
+          xcrun lipo -archs Dependencies/libcurl/libcurl.a
+      - name: Compile unsigned iPhoneOS app
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild \
+            -workspace AltStore.xcworkspace \
+            -scheme AltStore \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/altstore-derived" \
+            IPHONEOS_DEPLOYMENT_TARGET=17.4 \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            'CODE_SIGN_IDENTITY=' \
+            build 2>&1 | tee "$RUNNER_TEMP/altstore-xcodebuild.log"
+
+      - name: Package standard and LiveContainer-test unsigned IPAs
+        shell: bash
+        run: |
+          set -euo pipefail
+          app="$RUNNER_TEMP/altstore-derived/Build/Products/Release-iphoneos/AltStore.app"
+          if [ ! -d "$app" ]; then
+            echo "::error::AltStore.app was not produced."
+            exit 1
+          fi
+          test -f "$app/Info.plist"
+          execname="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Info.plist")"
+          bid="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$app/Info.plist")"
+          echo "Bundle ID: $bid"
+          echo "Executable: $execname"
+          test -f "$app/$execname"
+          xcrun lipo -info "$app/$execname"
+          file "$app/$execname"
+          # Source app is unsigned. Never embed credentials, pairing material, or certificates in the IPA.
+          mkdir -p "$RUNNER_TEMP/ipa-standard/Payload" "$RUNNER_TEMP/ipa-livecontainer/Payload"
+          ditto "$app" "$RUNNER_TEMP/ipa-standard/Payload/AltStore.app"
+          ditto "$app" "$RUNNER_TEMP/ipa-livecontainer/Payload/AltStore.app"
+          # LiveContainer cannot register app extensions. Remove them only from the experimental guest build.
+          guest="$RUNNER_TEMP/ipa-livecontainer/Payload/AltStore.app"
+          rm -rf "$guest/PlugIns" "$guest/Watch" "$guest/WatchKitSupport"
+          # No entitlement bypass is claimed. This only removes unsupported guest targets.
+          test -f "$guest/$execname"
+          (cd "$RUNNER_TEMP/ipa-standard" && /usr/bin/zip -q -r "$GITHUB_WORKSPACE/AltStore-Classic-2.3-PR1835-unsigned.ipa" Payload)
+          (cd "$RUNNER_TEMP/ipa-livecontainer" && /usr/bin/zip -q -r "$GITHUB_WORKSPACE/AltStore-Classic-2.3-PR1835-LiveContainer-test-unsigned.ipa" Payload)
+          for ipa in "$GITHUB_WORKSPACE"/*.ipa; do
+            echo "Checking $ipa"
+            unzip -tq "$ipa" | tail -1
+            ls -lh "$ipa"
+          done
+
+      - name: Upload PR1835 standard IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: AltStore-Classic-2.3-PR1835-unsigned
+          path: AltStore-Classic-2.3-PR1835-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload PR1835 LiveContainer test IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: AltStore-Classic-2.3-PR1835-LiveContainer-test-unsigned
+          path: AltStore-Classic-2.3-PR1835-LiveContainer-test-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Upload build log for troubleshooting
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: AltStore-PR1835-build-log
+          path: ${{ runner.temp }}/altstore-xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 7
