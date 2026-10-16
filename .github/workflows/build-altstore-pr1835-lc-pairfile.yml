@@ -112,64 +112,26 @@ jobs:
           print("Installed guest-safe UDID persistence patch")
           PY
 
-      - name: Enable manual pairing-file import (LiveContainer guest workaround)
+      - name: Enable manual pairing-file import for LiveContainer guests
         shell: bash
         run: |
           set -euo pipefail
           python3 - <<'PY'
           from pathlib import Path
-          p = Path("AltStore/Settings/RemoteAltServerSetupView.swift")
-          src = p.read_text()
-          patches = [
+          path = Path('AltStore/Settings/RemoteAltServerSetupView.swift')
+          src = path.read_text()
+          replacements = [
               ("import SwiftUI\n", "import SwiftUI\nimport UniformTypeIdentifiers\n"),
-              ("""    @State
-    private var isShowingError = false""", """    @State
-    private var isImportingPairingFile = false
-
-    @State
-    private var isShowingError = false"""),
-              ("""            .sensoryFeedback(.success, trigger: pairingState)""", """            .fileImporter(isPresented: $isImportingPairingFile,
-                          allowedContentTypes: [.data],
-                          allowsMultipleSelection: false) { result in
-                do
-                {
-                    guard let fileURL = try result.get().first else { throw CocoaError(.fileNoSuchFile) }
-                    let canAccess = fileURL.startAccessingSecurityScopedResource()
-                    defer { if canAccess { fileURL.stopAccessingSecurityScopedResource() } }
-
-                    let data = try Data(contentsOf: fileURL)
-                    let validatedFile = try FetchPairingFileOperation.PairingFile(data: data)
-                    Keychain.shared.devicePairingFile = validatedFile.data
-                    pairingState = .paired
-                    advance()
-                }
-                catch
-                {
-                    pairingState = .idle
-                    errorMessage = error.localizedDescription
-                    isShowingError = true
-                }
-            }
-            .sensoryFeedback(.success, trigger: pairingState)"""),
-              ("""            PairingButton(state: pairingState, idleTitle: "Start Pairing", waitingTitle: "Waiting to Pair…") {
-                pairingAttempt += 1
-            }""", """            VStack(spacing: 12) {
-                PairingButton(state: pairingState, idleTitle: "Start Pairing", waitingTitle: "Waiting to Pair…") {
-                    pairingAttempt += 1
-                }
-
-                SwiftUI.Button("Import Existing Pairing File") {
-                    isImportingPairingFile = true
-                }
-                .buttonStyle(.bordered)
-                .foregroundStyle(Color(uiColor: .label))
-            }"""),
+              ("    @State\n    private var isShowingError = false", "    @State\n    private var isImportingPairingFile = false\n\n    @State\n    private var isShowingError = false"),
+              ("            .sensoryFeedback(.success, trigger: pairingState)", "            .fileImporter(isPresented: $isImportingPairingFile,\n                          allowedContentTypes: [.data],\n                          allowsMultipleSelection: false) { result in\n                do\n                {\n                    guard let fileURL = try result.get().first else { throw CocoaError(.fileNoSuchFile) }\n                    let canAccess = fileURL.startAccessingSecurityScopedResource()\n                    defer { if canAccess { fileURL.stopAccessingSecurityScopedResource() } }\n\n                    let data = try Data(contentsOf: fileURL)\n                    _ = try FetchPairingFileOperation.PairingFile(data: data)\n\n                    // Check UDID when this is a lockdown-style pairing record.\n                    if let plist = try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],\n                       let pairedUDID = plist[\"UDID\"] as? String,\n                       let currentUDID = UserDefaults.shared.deviceID,\n                       pairedUDID.caseInsensitiveCompare(currentUDID) != .orderedSame\n                    {\n                        throw NSError(domain: \"AltStoreManualPairing\", code: 1, userInfo: [\n                            NSLocalizedDescriptionKey: \"This pairing file belongs to another device.\"\n                        ])\n                    }\n\n                    Keychain.shared.devicePairingFile = data\n                    guard Keychain.shared.devicePairingFile == data else\n                    {\n                        throw NSError(domain: \"AltStoreManualPairing\", code: 2, userInfo: [\n                            NSLocalizedDescriptionKey: \"Unable to save pairing file in Keychain.\"\n                        ])\n                    }\n\n                    pairingState = .paired\n                    advance()\n                }\n                catch\n                {\n                    pairingState = .idle\n                    errorMessage = error.localizedDescription\n                    isShowingError = true\n                }\n            }\n            .sensoryFeedback(.success, trigger: pairingState)"),
+              ("            PairingButton(state: pairingState, idleTitle: \"Start Pairing\", waitingTitle: \"Waiting to Pair…\") {\n                pairingAttempt += 1\n            }", "            PairingButton(state: pairingState, idleTitle: \"Start Pairing\", waitingTitle: \"Waiting to Pair…\") {\n                pairingAttempt += 1\n            }\n            SwiftUI.Button(\"Import Existing Pairing File\") {\n                isImportingPairingFile = true\n            }\n            .buttonStyle(.bordered)\n            .foregroundStyle(Color(uiColor: .label))"),
+              ("            PairingButton(state: pairingState, idleTitle: \"Pair with AltServer\", waitingTitle: \"Connecting to AltServer…\") {\n                pairingAttempt += 1\n            }", "            PairingButton(state: pairingState, idleTitle: \"Pair with AltServer\", waitingTitle: \"Connecting to AltServer…\") {\n                pairingAttempt += 1\n            }\n            SwiftUI.Button(\"Import Existing Pairing File\") {\n                isImportingPairingFile = true\n            }\n            .buttonStyle(.bordered)\n            .foregroundStyle(Color(uiColor: .label))"),
           ]
-          for old, new in patches:
-              assert src.count(old) == 1, f"Expected one match for {old[:90]!r}, got {src.count(old)}"
-              src = src.replace(old, new, 1)
-          p.write_text(src)
-          print("Manual pairing-file import patch applied and checked")
+          for before, after in replacements:
+              assert src.count(before) == 1, f'Unexpected upstream code around {before[:55]!r}'
+              src = src.replace(before, after, 1)
+          path.write_text(src)
+          print('Manual pairing importer installed; validated files stay on device')
           PY
 
       - name: Compile unsigned iPhoneOS app
