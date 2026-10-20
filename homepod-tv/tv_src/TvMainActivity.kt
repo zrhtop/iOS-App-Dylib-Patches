@@ -225,8 +225,9 @@ class TvMainActivity : ComponentActivity() {
         mainScroll = scroll
         setContentView(scroll)
 
-        body.addView(text("HomePod +   |   Android TV", 33f, white, true))
-        body.addView(text("Use D-pad to move, OK to select, Back/Home to leave. Casting stays in the foreground service.", 17f, soft))
+        body.addView(text("HomePod TV Mouse  |  v1.5.0-tv.3", 33f, white, true))
+        body.addView(text("V3 REMOTE CURSOR ACTIVE. Arrow keys move the white cursor. Hold to accelerate; OK clicks. Look for the turquoise TV MOUSE v3 badge at the upper right.", 19f, accent, true))
+        body.addView(text("Back/Home keep their normal functions. Casting uses a foreground service after leaving this screen.", 16f, soft))
 
         val stream = section(body, "Casting")
         statusLabel = text("Idle", 23f, accent, true)
