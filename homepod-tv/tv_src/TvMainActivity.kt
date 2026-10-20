@@ -200,7 +200,7 @@ class TvMainActivity : ComponentActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(55), dp(32), dp(55), dp(60))
         }
-        scroll.addView(body, ScrollView.LayoutParams(-1, -2))
+        scroll.addView(body, ViewGroup.LayoutParams(-1, -2))
         setContentView(scroll)
 
         body.addView(text("HomePod +   |   Android TV", 33f, white, true))
