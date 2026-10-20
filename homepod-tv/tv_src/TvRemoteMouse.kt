@@ -76,26 +76,22 @@ internal class TvRemoteMouse(
         layer.isClickable = false
         layer.isFocusable = false
         layer.importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        // Layout completion is the reliable point to initialize the pointer.
+        // A single post() can run before some vendor TV windows are measured.
+        layer.onReady = { width, height ->
+            if (!positioned && !destroyed && width > 0 && height > 0) {
+                positioned = true
+                x = width * 0.50f
+                y = height * 0.45f
+                move(0f, 0f)
+            }
+        }
         root.addView(layer, FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT
         ))
         layer.post {
-            if (!destroyed && !positioned) {
-                // Begin at the current focused control where possible, rather
-                // than making TV users traverse the whole display on first use.
-                val focused = root.findFocus()
-                val screenPoint = IntArray(2)
-                val rootPoint = IntArray(2)
-                focused?.getLocationOnScreen(screenPoint)
-                root.getLocationOnScreen(rootPoint)
-                x = if (focused != null && focused.width > 0) {
-                    (screenPoint[0] - rootPoint[0] + focused.width / 2f)
-                } else layer.width * .5f
-                y = if (focused != null && focused.height > 0) {
-                    (screenPoint[1] - rootPoint[1] + focused.height / 2f)
-                } else layer.height * .45f
-                positioned = true
-                move(0f, 0f)
+            if (!destroyed && !positioned && layer.width > 0 && layer.height > 0) {
+                layer.onReady?.invoke(layer.width, layer.height)
             }
         }
     }
@@ -104,6 +100,8 @@ internal class TvRemoteMouse(
         if (destroyed) return
         active = true
         layer.visibility = View.VISIBLE
+        layer.bringToFront()
+        layer.invalidate()
     }
 
     fun pause() {
@@ -242,6 +240,7 @@ internal class TvRemoteMouse(
         var cursorX = 0f
         var cursorY = 0f
         var flashUntil = 0L
+        var onReady: ((Int, Int) -> Unit)? = null
 
         private val d = resources.displayMetrics.density
         private val stroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -259,6 +258,17 @@ internal class TvRemoteMouse(
             style = Paint.Style.STROKE
             strokeWidth = 3f * d
         }
+        private val badgeFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.rgb(0, 134, 168)
+            style = Paint.Style.FILL
+        }
+        private val badgeText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 15f * d
+            typeface = android.graphics.Typeface.create(
+                android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD
+            )
+        }
         private val arrow = Path().apply {
             moveTo(0f, 0f)
             lineTo(1f * d, 27f * d)
@@ -270,8 +280,29 @@ internal class TvRemoteMouse(
             close()
         }
 
+        override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+            super.onSizeChanged(w, h, oldw, oldh)
+            if (w > 0 && h > 0) {
+                if (cursorX == 0f && cursorY == 0f) {
+                    cursorX = w * .5f
+                    cursorY = h * .45f
+                }
+                onReady?.invoke(w, h)
+                invalidate()
+            }
+        }
+
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
+            // Distinct, always-on marker confirms that the TV cursor activity
+            // (rather than the original phone launcher) is actually running.
+            val right = width - 12f * d
+            val left = right - 177f * d
+            canvas.drawRoundRect(
+                left, 12f * d, right, 46f * d,
+                9f * d, 9f * d, badgeFill
+            )
+            canvas.drawText("TV MOUSE v3  ●", left + 12f * d, 35f * d, badgeText)
             canvas.save()
             canvas.translate(cursorX, cursorY)
             if (SystemClock.uptimeMillis() < flashUntil) {
