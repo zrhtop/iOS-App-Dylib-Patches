@@ -302,7 +302,7 @@ internal class TvRemoteMouse(
                 left, 12f * d, right, 46f * d,
                 9f * d, 9f * d, badgeFill
             )
-            canvas.drawText("TV MOUSE v3  ●", left + 12f * d, 35f * d, badgeText)
+            canvas.drawText("遥控鼠标 v4  ●", left + 12f * d, 35f * d, badgeText)
             canvas.save()
             canvas.translate(cursorX, cursorY)
             if (SystemClock.uptimeMillis() < flashUntil) {
