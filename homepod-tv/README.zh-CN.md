@@ -1,54 +1,66 @@
-# HomePod TV Mouse (Android TV) v1.5.0-tv.3
+# HomePod 电视遥控 v1.5.0-tv.4（简体中文版）
 
-本项目基于 [M-Pennn/HomePod-Plus v1.5](https://github.com/M-Pennn/HomePod-Plus/releases/tag/v1.5)，保留上游 AirPlay 2 发送、音频捕获、双 HomePod、音量、延迟及后台服务，增加 Android TV 专用界面与方向键虚拟鼠标。
+在 [HomePod Plus v1.5](https://github.com/M-Pennn/HomePod-Plus/releases/tag/v1.5) 基础上移植的 Android TV 应用，保留 AirPlay 2 投送引擎、双音箱、音量、延迟、ALAC、弱网增强和前台后台投送服务。
 
-## 下载已验证的 APK
+## 直接安装
 
-- [GitHub Actions 成功构建 #39377876872](https://github.com/zrhtop/iOS-App-Dylib-Patches/actions/runs/39377876872)
-- Artifact: `HomePodPlus-TV-v1.5.0-tv.3-Mouse-Verified-APK`
-- APK: ZIP 内的 `app-debug.apk`
-- SHA-256: `3ed375132f680000fd4c3d23e842baea8d88654b5011b5413b59d6626eb240fc`
+- [GitHub Actions 成功构建 #39379719134](https://github.com/zrhtop/iOS-App-Dylib-Patches/actions/runs/39379719134)
+- 构建产物：`HomePod-TV-v1.5.0-tv.4-CN-NSD-Fix-APK`，解压后安装 `app-debug.apk`
+- 应用名称：**HomePod 电视遥控**
+- 包名：`com.homepodplus.tv.remote`（与 v1.5.0-tv.3 相同）
+- 版本：`1.5.0-tv.4`；版本号：154
+- 最低 Android 版本：Android 10 / API 29
 
-这次进行了 **独立应用标识** 修复，安装后会新增一个应用，不会替代此前 APK：
+APK SHA-256：
 
-| 项目 | 新版本 |
-| --- | --- |
-| 应用显示名称 | **HomePod TV Mouse** |
-| 包名 | `com.homepodplus.tv.remote` |
-| 版本 | `1.5.0-tv.3` |
-| 最低系统 | Android 10 / API 29 |
-| 启动界面 | `com.homepodplus.app.TvMainActivity` |
-| 应用图标 | 蓝绿色鼠标箭头 |
-| 界面识别标记 | 右上角常驻 `TV MOUSE v3` |
+```text
+126e6785f1916c78bcb3a95e76a3f9e018967be64f6442421335229c8c452758
+```
 
-旧版 `HomePod +` 和新版 `HomePod TV Mouse` 会同时出现在电视应用列表。**请务必打开新版 HomePod TV Mouse，而不是旧版 HomePod +。**
+GitHub Actions 已完成 Kotlin 编译、APK ZIP 完整性校验、v2 签名校验、Android TV 启动入口检查，并验证编译产物包含 `TvRemoteMouse`、`TvMainActivity`、`nsdResolveQueue` 与 `resolveNextNsd`。
 
-## 遥控操作
+## 已修改内容
 
-- 方向键上下左右：移动应用内白色鼠标指针
-- 长按方向键：连续移动并逐渐加速
-- OK / 确定键：在指针位置模拟左键单击
-- 指针靠近页面上下边缘：滚动内容
-- 频道/翻页键：翻页（电视遥控器支持时）
-- Back/Home、音量：保留系统默认操作
+### NSD 解析失败：错误码 3
 
-添加 HomePod IP 地址的应用内弹窗也实现了虚拟指针。Android 系统权限申请、系统音频投屏授权弹窗属于系统窗口，不受应用内部鼠标控制，需要使用系统自身的 D-pad 焦点操作。
+Android `NsdManager.FAILURE_ALREADY_ACTIVE` 的值是 `3`，表示此前的解析请求尚在执行。上游代码在多次 `onServiceFound` 后并发调用 `resolveService`，可能在部分 Android TV 固件上出现大量此错误。
 
-## GitHub 检查结果
+此版加入：
 
-- `assembleDebug` 编译通过
-- APK ZIP 结构检查通过
-- APK v2 签名验证通过
-- `aapt dump badging` 验证普通启动和 LEANBACK 电视启动都指向 `TvMainActivity`
-- 验证没有保留旧手机界面的启动入口
-- 验证 `TvRemoteMouse`、`TvMainActivity` 和独立的电视鼠标图标均存在于编译 APK
-- 下载产物的 SHA-256 与 GitHub Actions 一致
+- NSD 单一活动解析请求与队列，其余服务依次等待
+- 按服务名和服务类型去重，避免重复排队
+- 对错误码 3 限次延迟重试，并暂缓新解析任务
+- 出错时继续使用项目既有原始 mDNS 发现，不删除手动添加 IP 的功能
+- 断开扫描时清理待处理队列，防止老任务遗留
 
-**还需要实机验证：** 这些检查验证了构建内容，但不代表不同厂商电视的遥控事件、触摸模拟、音频投送或后台运行已经经过真实电视测试。
+**注意：** 这一改动解决了应用自身同时发起多项解析造成的冲突，但无法保证某些 Android TV 固件完全没有 NSD 兼容问题。已通过编译校验，尚未在你的电视和 HomePod 上验证自动发现成功。
 
-如果安装后仍看不到白色鼠标箭头，先确认顶部标题为 `HomePod TV Mouse | v1.5.0-tv.3` 且右上角出现 `TV MOUSE v3`；如果看不到，请拍摄电视显示和应用信息页以确认实际打开的 APK。
+### 简体中文界面
 
-## 系统限制
+主界面、设备搜索、主副音箱设置、声道、延迟、安全提示、手动编辑音箱、音量、网络增强、状态和日志入口已转为简体中文。Android 系统权限对话框仍然由系统语言控制，AirPlay 原始技术日志中的协议名保留。
 
-Android 原生应用不能无条件捕获 Netflix 等 DRM 音频、HDMI 输入和禁止捕获的应用音频。Android 可撤销 MediaProjection 授权，网络断线恢复不能绕过系统重新授权。部分遥控音量键由 HDMI-CEC 或系统接管。
+### 遥控鼠标
+
+保留 v3 已可工作的内部指针：
+
+- 方向键上下左右移动白色指针
+- 长按方向键连续移动并加速
+- OK / 确认键模拟应用内鼠标左键
+- 页面边缘自动滚动
+- 返回键、Home 键仍为系统功能
+- 右上角标记“遥控鼠标 v4”
+
+无需悬浮窗或无障碍权限；仅控制本应用界面，不控制其他应用或系统权限弹窗。
+
+## 安装升级注意
+
+各次 GitHub Actions Debug APK 可能使用不同的调试签名。若从 v1.5.0-tv.3 覆盖安装时出现 `INSTALL_FAILED_UPDATE_INCOMPATIBLE` / 安装失败，请先记下手动配置的 HomePod 地址，然后卸载 `HomePod TV Mouse` 旧版再安装此版；卸载会清空旧版保存的设置。最早的 `HomePod +` 测试版属于另一包名，可独立保留或删除。
+
+## 排查发现问题
+
+如果仍找不到音箱，确保 Android TV 和 HomePod 位于可互访的同一个局域网或可转发 mDNS 的网络，关闭路由器 AP 隔离或访客网络隔离（如果存在）。可在路由器上查到 HomePod IPv4 地址后点击“手动添加 IP 地址”。注意实际投送端口不一定总是 7000，若手动连接失败请记录日志。
+
+## Android 系统限制
+
+受 DRM 保护的 App 音频、HDMI 输入以及禁止 AudioPlaybackCapture 的应用声音无法保证被捕获。若系统撤销 MediaProjection 授权，需要用户再次允许。GitHub 构建成功不等于真实 HomePod 的长期稳定性测试已完成。
 
