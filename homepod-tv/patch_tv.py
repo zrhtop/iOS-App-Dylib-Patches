@@ -29,12 +29,28 @@ def patch_manifest(content: str) -> str:
         '    <uses-permission android:name="android.permission.INTERNET" />',
         'manifest permissions and TV features')
     # Fully-qualified names allow the TV fork to use a separate package id.
-    content = content.replace('android:name=".MainActivity"', 'android:name="com.homepodplus.app.MainActivity"')
+    content = replace_once(content,
+        '''        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>''',
+        '''        <!-- Keep the original mobile activity internal for compatibility,
+             but never offer it to a launcher on a television. -->
+        <activity
+            android:name="com.homepodplus.app.MainActivity"
+            android:exported="false"
+            android:launchMode="singleTop" />''',
+        'remove mobile launcher so TV cursor is the only entry')
     content = content.replace('android:name=".CastService"', 'android:name="com.homepodplus.app.CastService"')
     content = content.replace('android:name=".HomePodTileService"', 'android:name="com.homepodplus.app.HomePodTileService"')
     content = replace_once(content,
         '        android:label="@string/app_name"',
-        '        android:label="@string/app_name"\n        android:banner="@drawable/tv_banner"',
+        '        android:label="HomePod TV Mouse"\n        android:banner="@drawable/tv_banner"',
         'TV banner')
     content = replace_once(content,
         '        <service\n            android:name="com.homepodplus.app.CastService"',
@@ -47,6 +63,10 @@ def patch_manifest(content: str) -> str:
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
         </activity>
         <service
             android:name="com.homepodplus.app.CastService"''',
@@ -57,10 +77,12 @@ def patch_manifest(content: str) -> str:
 def patch_gradle(content: str) -> str:
     content = replace_once(content,
         'applicationId "com.homepodplus.app"',
-        'applicationId "com.homepodplus.tv"',
+        'applicationId "com.homepodplus.tv.remote"',
         'standalone Android TV application ID')
     content = replace_once(content, 'versionName "1.5.0"',
-        'versionName "1.5.0-tv.2"', 'TV release version')
+        'versionName "1.5.0-tv.3"', 'TV release version')
+    content = replace_once(content, 'versionCode 150',
+        'versionCode 153', 'TV cursor release version code')
     return content
 
 
@@ -342,7 +364,7 @@ def main() -> None:
     banner = Image.new('RGB', (640, 360), (13, 20, 36))
     draw = ImageDraw.Draw(banner)
     draw.rounded_rectangle((40, 55, 600, 305), radius=30, fill=(27, 48, 82), outline=(61, 154, 229), width=4)
-    draw.text((105, 145), "HomePod + Android TV", fill=(235, 246, 255), stroke_width=0)
+    draw.text((105, 145), "HomePod TV Mouse v3", fill=(235, 246, 255), stroke_width=0)
     banner.save(images / 'tv_banner.png', optimize=True)
     print('Android TV source patch applied. Build with ./gradlew :app:assembleDebug')
     print('APK: app/build/outputs/apk/debug/app-debug.apk')
