@@ -75,7 +75,7 @@ class TvMainActivity : ComponentActivity() {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) askForMediaProjection()
-        else notice("Audio capture permission is required to send TV audio to HomePod.")
+        else notice("需要先允许录制音频，才能将电视声音投送到 HomePod。")
     }
 
     private val mediaProjectionRequest = registerForActivityResult(
@@ -93,7 +93,7 @@ class TvMainActivity : ComponentActivity() {
                 .putExtra(CastService.EXTRA_IS_DUAL, pendingDual)
             ContextCompat.startForegroundService(this, command)
         } else if (device != null) {
-            notice("Projection was not approved. Audio capture has not started.")
+            notice("尚未允许系统音频捕获，投送没有启动。")
         }
         pendingDevice = null
         pendingDual = false
@@ -174,7 +174,7 @@ class TvMainActivity : ComponentActivity() {
 
     private fun beginCast(device: AirplayDevice, dual: Boolean) {
         if (CastController.state.value.connecting || CastController.state.value.streaming) {
-            notice("Stop the current stream before starting another.")
+            notice("请先停止当前投送，再连接其他音箱。")
             return
         }
         pendingDevice = device
@@ -195,7 +195,7 @@ class TvMainActivity : ComponentActivity() {
     private fun startDual() {
         val config = CastController.state.value.dualConfig
         if (!config.isConfigured) {
-            notice("Select both primary and secondary speakers first.")
+            notice("请先设置主音箱和副音箱。")
             return
         }
         CastController.setVolume(config.defaultVolume)
@@ -225,100 +225,100 @@ class TvMainActivity : ComponentActivity() {
         mainScroll = scroll
         setContentView(scroll)
 
-        body.addView(text("HomePod TV Mouse  |  v1.5.0-tv.3", 33f, white, true))
-        body.addView(text("V3 REMOTE CURSOR ACTIVE. Arrow keys move the white cursor. Hold to accelerate; OK clicks. Look for the turquoise TV MOUSE v3 badge at the upper right.", 19f, accent, true))
-        body.addView(text("Back/Home keep their normal functions. Casting uses a foreground service after leaving this screen.", 16f, soft))
+        body.addView(text("HomePod 电视遥控版  |  v1.5.0-tv.4", 33f, white, true))
+        body.addView(text("遥控鼠标已启用：方向键移动白色光标，长按可加速，确认键相当于鼠标左键。右上角会显示「遥控鼠标 v4」。", 19f, accent, true))
+        body.addView(text("返回键和 Home 键保持原有作用。离开界面后，音频投送仍由前台服务运行。", 16f, soft))
 
-        val stream = section(body, "Casting")
-        statusLabel = text("Idle", 23f, accent, true)
+        val stream = section(body, "音频投送")
+        statusLabel = text("未连接", 23f, accent, true)
         stream.addView(statusLabel)
-        dualButton = action("Start dual speakers") { startDual() }
-        stopButton = action("Stop casting") { CastController.stop(this) }
+        dualButton = action("连接双音箱") { startDual() }
+        stopButton = action("停止投送") { CastController.stop(this) }
         actionRow(stream, dualButton, stopButton)
-        volumeLabel = text("HomePod volume: 50%", 21f, white)
+        volumeLabel = text("HomePod 音量：50%", 21f, white)
         stream.addView(volumeLabel)
         actionRow(stream,
-            action("Volume -5%") { changeVolume(-5f) },
-            action("Volume +5%") { changeVolume(5f) }
+            action("音量 -5%") { changeVolume(-5f) },
+            action("音量 +5%") { changeVolume(5f) }
         )
-        testToneButton = action("440 Hz test tone") { CastController.toggleTestTone(this) }
-        actionRow(stream, testToneButton, action("Refresh discovery") {
+        testToneButton = action("440 Hz 测试音") { CastController.toggleTestTone(this) }
+        actionRow(stream, testToneButton, action("重新搜索音箱") {
             CastController.stopDiscovery()
             CastController.startDiscovery(this)
         })
 
-        val devices = section(body, "Discovered and saved AirPlay speakers")
-        devices.addView(text("Connect a speaker, assign it as primary or secondary, or add an IP manually.", 16f, soft))
-        actionRow(devices, action("Add speaker by IP") { editSpeakerDialog(null) })
+        val devices = section(body, "已发现和已保存的 AirPlay 音箱")
+        devices.addView(text("可以直接连接音箱，也可以设为主音箱或副音箱，或手动输入 IP 地址。", 16f, soft))
+        actionRow(devices, action("手动添加 IP 地址") { editSpeakerDialog(null) })
         deviceList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         devices.addView(deviceList)
 
-        val config = section(body, "Dual-speaker configuration")
+        val config = section(body, "双音箱设置")
         actionRow(config,
-            action("Edit primary name / IP / port") { editSpeakerDialog(1) },
-            action("Edit secondary name / IP / port") { editSpeakerDialog(2) }
+            action("编辑主音箱名称 / IP / 端口") { editSpeakerDialog(1) },
+            action("编辑副音箱名称 / IP / 端口") { editSpeakerDialog(2) }
         )
-        primaryButton = action("Primary: not selected") { editSpeakerDialog(1) }
-        secondaryButton = action("Secondary: not selected") { editSpeakerDialog(2) }
+        primaryButton = action("主音箱：未设置") { editSpeakerDialog(1) }
+        secondaryButton = action("副音箱：未设置") { editSpeakerDialog(2) }
         actionRow(config, primaryButton, secondaryButton)
 
-        channelButton = action("Output: stereo") {
+        channelButton = action("声道模式：完整立体声") {
             mutateConfig { it.copy(channelMode = if (it.channelMode == ChannelMode.STEREO) ChannelMode.SPLIT else ChannelMode.STEREO) }
         }
-        leftButton = action("Left channel: primary") {
+        leftButton = action("左声道：主音箱") {
             mutateConfig {
                 it.copy(leftSpeaker = if (it.leftSpeaker == LeftSpeakerAssignment.SPEAKER1_LEFT) LeftSpeakerAssignment.SPEAKER2_LEFT else LeftSpeakerAssignment.SPEAKER1_LEFT)
             }
         }
         actionRow(config, channelButton, leftButton)
 
-        offsetModeButton = action("Volume follow: fixed difference") {
+        offsetModeButton = action("音量联动：固定差值") {
             mutateConfig { it.copy(offsetMode = if (it.offsetMode == VolumeOffsetMode.FIXED) VolumeOffsetMode.RATIO else VolumeOffsetMode.FIXED) }
         }
         actionRow(config, offsetModeButton)
-        offsetLabel = text("Secondary volume adjustment: -10%", 19f, white)
+        offsetLabel = text("副音箱音量偏移：-10%", 19f, white)
         config.addView(offsetLabel)
         actionRow(config,
-            action("Offset -5") { mutateConfig { it.copy(offsetValue = (it.offsetValue - 5f).coerceIn(-100f, 100f)) } },
-            action("Offset +5") { mutateConfig { it.copy(offsetValue = (it.offsetValue + 5f).coerceIn(-100f, 100f)) } }
+            action("偏移 -5") { mutateConfig { it.copy(offsetValue = (it.offsetValue - 5f).coerceIn(-100f, 100f)) } },
+            action("偏移 +5") { mutateConfig { it.copy(offsetValue = (it.offsetValue + 5f).coerceIn(-100f, 100f)) } }
         )
-        defaultsLabel = text("Default volume on dual connect: 50%", 19f, white)
+        defaultsLabel = text("双音箱默认音量：50%", 19f, white)
         config.addView(defaultsLabel)
         actionRow(config,
-            action("Default -5%") { mutateConfig { it.copy(defaultVolume = (it.defaultVolume - 5f).coerceIn(0f, 100f)) } },
-            action("Default +5%") { mutateConfig { it.copy(defaultVolume = (it.defaultVolume + 5f).coerceIn(0f, 100f)) } }
+            action("默认音量 -5%") { mutateConfig { it.copy(defaultVolume = (it.defaultVolume - 5f).coerceIn(0f, 100f)) } },
+            action("默认音量 +5%") { mutateConfig { it.copy(defaultVolume = (it.defaultVolume + 5f).coerceIn(0f, 100f)) } }
         )
 
-        val network = section(body, "Audio and network stability")
-        network.addView(text("Prefer SAFE (2s) or STABLE (1.5s) if HomePod audio skips.", 17f, soft))
+        val network = section(body, "音频与网络稳定性")
+        network.addView(text("如有卡顿，建议使用「安全 2 秒」或「稳定 1.5 秒」延迟模式。", 17f, soft))
         val latencyChoices = LatencyMode.entries.map { mode ->
             val button = action(mode.name) { CastController.setLatencyMode(mode) }
             latencyButtons[mode] = button
             button
         }
         actionRow(network, *latencyChoices.toTypedArray())
-        robustButton = action("Robust network mode: OFF") {
+        robustButton = action("弱网增强：关") {
             CastController.setRobustMode(!CastController.state.value.robustMode)
         }
-        alacButton = action("ALAC compression: ON") {
+        alacButton = action("ALAC 压缩：开") {
             CastController.setAlac(!CastController.state.value.alacOn)
         }
         actionRow(network, robustButton, alacButton)
-        hwVolumeButton = action("Remote/physical volume follow: ON") {
+        hwVolumeButton = action("遥控器音量联动：开") {
             mutateConfig { it.copy(hardwareVolControl = !it.hardwareVolControl) }
         }
-        notificationButton = action("Persistent controls: ON") {
+        notificationButton = action("常驻通知控制：开") {
             mutateConfig { it.copy(showPersistentNotification = !it.showPersistentNotification) }
         }
         actionRow(network, hwVolumeButton, notificationButton)
-        network.addView(text("TV remote volume buttons may be intercepted by CEC/system. Use the Volume +/- buttons above in that case. The original mobile notification and quick-settings tile remain in the app but TV launchers do not expose them consistently.", 15f, soft))
+        network.addView(text("有些电视的音量键会由 HDMI-CEC 或电视系统接管。如果不能直接调整 HomePod 音量，请使用上方的音量按钮。某些电视无法显示原版手机通知栏和快捷设置入口。", 15f, soft))
 
-        val logging = section(body, "Connection diagnostics")
-        actionRow(logging, action("Clear on-screen logs") { CastController.clearLogs() })
-        logsLabel = text("No log messages", 16f, soft)
+        val logging = section(body, "连接日志与诊断")
+        actionRow(logging, action("清空日志") { CastController.clearLogs() })
+        logsLabel = text("暂无日志", 16f, soft)
         logging.addView(logsLabel)
 
-        body.addView(text("Limits: protected/DRM app audio and HDMI input cannot be captured by a normal Android TV app. If the system ends the media-projection permission, reconnecting requires you to approve capture again.", 15f, soft))
+        body.addView(text("系统限制：一般 Android TV 应用无法捕获受 DRM 保护的声音或 HDMI 输入。若系统终止音频捕获授权，需要再次手动允许。", 15f, soft))
         dualButton.requestFocus()
         refresh(CastController.state.value)
     }
@@ -333,7 +333,7 @@ class TvMainActivity : ComponentActivity() {
         volumeLabel.text = "HomePod volume: ${state.volume.toInt()}%"
         dualButton.isEnabled = state.dualConfig.isConfigured && !state.connecting && !state.streaming
         stopButton.isEnabled = state.connecting || state.streaming
-        testToneButton.text = if (state.testToneOn) "Stop test tone" else "440 Hz test tone"
+        testToneButton.text = if (state.testToneOn) "Stop test tone" else "440 Hz 测试音"
         robustButton.text = "Robust network mode: ${if (state.robustMode) "ON" else "OFF"}"
         alacButton.text = "ALAC compression: ${if (state.alacOn) "ON" else "OFF"}"
         channelButton.text = "Output: ${if (state.dualConfig.channelMode == ChannelMode.SPLIT) "split L / R" else "full stereo"}"
@@ -348,7 +348,7 @@ class TvMainActivity : ComponentActivity() {
         for ((mode, button) in latencyButtons) {
             button.text = "${mode.name}${if (mode == state.latencyMode) " [ACTIVE]" else ""}"
         }
-        logsLabel.text = state.logs.takeLast(12).joinToString("\n").ifBlank { "No log messages" }
+        logsLabel.text = state.logs.takeLast(12).joinToString("\n").ifBlank { "暂无日志" }
         refreshDeviceList(state.devices)
     }
 
@@ -359,21 +359,21 @@ class TvMainActivity : ComponentActivity() {
         val rememberedFocus = deviceList.findFocus()?.tag as? String
         deviceList.removeAllViews()
         if (devices.isEmpty()) {
-            deviceList.addView(text("No speakers found yet. Try Refresh discovery or Add speaker by IP.", 17f, soft))
+            deviceList.addView(text("暂未发现音箱。可点击「重新搜索音箱」，或手动输入 IP 地址。", 17f, soft))
         }
         for (device in devices) {
             deviceList.addView(text("${device.name}   ${device.host}:${device.port}", 20f, white, true))
             val controls = ArrayList<Button>()
             val key = "${device.host}:${device.port}"
-            controls += action("Connect") { beginCast(device, false) }.apply { tag = "$key:connect" }
-            controls += action("Set primary") {
+            controls += action("连接") { beginCast(device, false) }.apply { tag = "$key:connect" }
+            controls += action("设为主音箱") {
                 mutateConfig { it.copy(speaker1Name = device.name, speaker1Host = device.host, speaker1Port = device.port) }
             }.apply { tag = "$key:primary" }
-            controls += action("Set secondary") {
+            controls += action("设为副音箱") {
                 mutateConfig { it.copy(speaker2Name = device.name, speaker2Host = device.host, speaker2Port = device.port) }
             }.apply { tag = "$key:secondary" }
             if (device.type == "_manual") {
-                controls += action("Remove") { CastController.removeManual(device) }.apply { tag = "$key:remove" }
+                controls += action("移除") { CastController.removeManual(device) }.apply { tag = "$key:remove" }
             }
             actionRow(deviceList, *controls.toTypedArray())
         }
@@ -403,14 +403,14 @@ class TvMainActivity : ComponentActivity() {
                 form.addView(this, LinearLayout.LayoutParams(-1, dp(68)))
             }
         }
-        val name = field("Speaker name", currentName)
-        val host = field("IPv4 or hostname", currentHost)
-        val port = field("Port", currentPort.toString(), true)
+        val name = field("音箱名称", currentName)
+        val host = field("IPv4 地址或主机名", currentHost)
+        val port = field("端口", currentPort.toString(), true)
         AlertDialog.Builder(this)
-            .setTitle(if (slot == null) "Add speaker" else "Edit ${if (slot == 1) "primary" else "secondary"} speaker")
+            .setTitle(if (slot == null) "添加音箱" else "Edit ${if (slot == 1) "primary" else "secondary"} speaker")
             .setView(form)
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Save", null)
+            .setNegativeButton("取消", null)
+            .setPositiveButton("保存", null)
             .create().apply {
                 setOnShowListener {
                     getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -418,7 +418,7 @@ class TvMainActivity : ComponentActivity() {
                         val parsedPort = port.text.toString().toIntOrNull()
                         val parsedName = name.text.toString().trim().ifEmpty { "HomePod" }
                         if (parsedHost.isBlank() || parsedPort == null || parsedPort !in 1..65535) {
-                            notice("Enter a valid host and a port between 1 and 65535.")
+                            notice("请输入有效的 IP / 主机名，端口范围为 1 至 65535。")
                             return@setOnClickListener
                         }
                         when (slot) {
@@ -445,7 +445,7 @@ class TvMainActivity : ComponentActivity() {
 
     private fun notice(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
-        CastController.addLog("TV UI: $message")
+        CastController.addLog("电视界面：$message")
     }
 
     private fun section(body: LinearLayout, title: String): LinearLayout {
