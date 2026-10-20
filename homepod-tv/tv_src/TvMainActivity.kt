@@ -202,6 +202,13 @@ class TvMainActivity : ComponentActivity() {
         beginCast(AirplayDevice(config.speaker1Name, config.speaker1Host, config.speaker1Port), true)
     }
 
+    private fun latencyName(mode: LatencyMode): String = when (mode) {
+        LatencyMode.SAFE -> "安全（2 秒）"
+        LatencyMode.STABLE -> "稳定（1.5 秒）"
+        LatencyMode.LOW -> "低延迟（0.25 秒）"
+        LatencyMode.ULTRA -> "超低延迟（0.1 秒）"
+    }
+
     private fun changeVolume(diff: Float) {
         CastController.setVolume(CastController.state.value.volume + diff)
     }
@@ -292,7 +299,7 @@ class TvMainActivity : ComponentActivity() {
         val network = section(body, "音频与网络稳定性")
         network.addView(text("如有卡顿，建议使用「安全 2 秒」或「稳定 1.5 秒」延迟模式。", 17f, soft))
         val latencyChoices = LatencyMode.entries.map { mode ->
-            val button = action(mode.name) { CastController.setLatencyMode(mode) }
+            val button = action(latencyName(mode)) { CastController.setLatencyMode(mode) }
             latencyButtons[mode] = button
             button
         }
@@ -326,27 +333,27 @@ class TvMainActivity : ComponentActivity() {
     private fun refresh(state: CastController.UiState) {
         if (!::statusLabel.isInitialized) return
         statusLabel.text = when {
-            state.streaming -> "Streaming  |  ${state.status}"
-            state.connecting -> "Connecting  |  ${state.status}"
-            else -> "Disconnected  |  ${state.status}"
+            state.streaming -> "正在投送  |  ${state.status}"
+            state.connecting -> "连接中  |  ${state.status}"
+            else -> "未连接  |  ${state.status}"
         }
-        volumeLabel.text = "HomePod volume: ${state.volume.toInt()}%"
+        volumeLabel.text = "HomePod 音量：${state.volume.toInt()}%"
         dualButton.isEnabled = state.dualConfig.isConfigured && !state.connecting && !state.streaming
         stopButton.isEnabled = state.connecting || state.streaming
-        testToneButton.text = if (state.testToneOn) "Stop test tone" else "440 Hz 测试音"
-        robustButton.text = "Robust network mode: ${if (state.robustMode) "ON" else "OFF"}"
-        alacButton.text = "ALAC compression: ${if (state.alacOn) "ON" else "OFF"}"
-        channelButton.text = "Output: ${if (state.dualConfig.channelMode == ChannelMode.SPLIT) "split L / R" else "full stereo"}"
-        leftButton.text = "Left channel: ${if (state.dualConfig.leftSpeaker == LeftSpeakerAssignment.SPEAKER1_LEFT) "primary" else "secondary"}"
-        offsetModeButton.text = "Volume follow: ${if (state.dualConfig.offsetMode == VolumeOffsetMode.FIXED) "fixed difference" else "relative ratio"}"
-        offsetLabel.text = "Secondary volume adjustment: ${state.dualConfig.offsetValue.toInt()}%"
-        defaultsLabel.text = "Default volume on dual connect: ${state.dualConfig.defaultVolume.toInt()}%"
-        hwVolumeButton.text = "Physical volume follow: ${if (state.dualConfig.hardwareVolControl) "ON" else "OFF"}"
-        notificationButton.text = "Persistent controls: ${if (state.dualConfig.showPersistentNotification) "ON" else "OFF"}"
-        primaryButton.text = "Primary: ${state.dualConfig.speaker1Name} (${state.dualConfig.speaker1Host.ifBlank { "not selected" }})"
-        secondaryButton.text = "Secondary: ${state.dualConfig.speaker2Name} (${state.dualConfig.speaker2Host.ifBlank { "not selected" }})"
+        testToneButton.text = if (state.testToneOn) "关闭测试音" else "440 Hz 测试音"
+        robustButton.text = "弱网增强：${if (state.robustMode) "开" else "关"}"
+        alacButton.text = "ALAC 压缩：${if (state.alacOn) "开" else "关"}"
+        channelButton.text = "声道模式：${if (state.dualConfig.channelMode == ChannelMode.SPLIT) "左右声道分离" else "完整立体声"}"
+        leftButton.text = "左声道：${if (state.dualConfig.leftSpeaker == LeftSpeakerAssignment.SPEAKER1_LEFT) "主音箱" else "副音箱"}"
+        offsetModeButton.text = "音量联动：${if (state.dualConfig.offsetMode == VolumeOffsetMode.FIXED) "固定差值" else "相对比例"}"
+        offsetLabel.text = "副音箱音量偏移：${state.dualConfig.offsetValue.toInt()}%"
+        defaultsLabel.text = "双音箱默认音量：${state.dualConfig.defaultVolume.toInt()}%"
+        hwVolumeButton.text = "遥控器音量联动：${if (state.dualConfig.hardwareVolControl) "开" else "关"}"
+        notificationButton.text = "常驻通知控制：${if (state.dualConfig.showPersistentNotification) "开" else "关"}"
+        primaryButton.text = "主音箱：${state.dualConfig.speaker1Name} (${state.dualConfig.speaker1Host.ifBlank { "未设置" }})"
+        secondaryButton.text = "副音箱：${state.dualConfig.speaker2Name} (${state.dualConfig.speaker2Host.ifBlank { "未设置" }})"
         for ((mode, button) in latencyButtons) {
-            button.text = "${mode.name}${if (mode == state.latencyMode) " [ACTIVE]" else ""}"
+            button.text = "${latencyName(mode)}${if (mode == state.latencyMode) "（当前）" else ""}"
         }
         logsLabel.text = state.logs.takeLast(12).joinToString("\n").ifBlank { "暂无日志" }
         refreshDeviceList(state.devices)
@@ -407,7 +414,7 @@ class TvMainActivity : ComponentActivity() {
         val host = field("IPv4 地址或主机名", currentHost)
         val port = field("端口", currentPort.toString(), true)
         AlertDialog.Builder(this)
-            .setTitle(if (slot == null) "添加音箱" else "Edit ${if (slot == 1) "primary" else "secondary"} speaker")
+            .setTitle(if (slot == null) "添加音箱" else "编辑${if (slot == 1) "主" else "副"}音箱")
             .setView(form)
             .setNegativeButton("取消", null)
             .setPositiveButton("保存", null)
