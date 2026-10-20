@@ -60,7 +60,7 @@ def patch_gradle(content: str) -> str:
         'applicationId "com.homepodplus.tv"',
         'standalone Android TV application ID')
     content = replace_once(content, 'versionName "1.5.0"',
-        'versionName "1.5.0-tv.1"', 'TV release version')
+        'versionName "1.5.0-tv.2"', 'TV release version')
     return content
 
 
@@ -317,6 +317,7 @@ def main() -> None:
     discovery = root / 'java' / 'com' / 'homepodplus' / 'app' / 'airplay' / 'MdnsDiscoverer.kt'
     gradle = project / 'app' / 'build.gradle'
     dest_tv = root / 'java' / 'com' / 'homepodplus' / 'app' / 'TvMainActivity.kt'
+    dest_mouse = root / 'java' / 'com' / 'homepodplus' / 'app' / 'TvRemoteMouse.kt'
     for file in (manifest, controller, service, discovery, gradle):
         if not file.is_file():
             sys.exit(f'Missing upstream source file: {file}')
@@ -328,11 +329,12 @@ def main() -> None:
         discovery: patch_discovery(discovery.read_text(encoding='utf-8-sig')),
         gradle: patch_gradle(gradle.read_text(encoding='utf-8-sig')),
     }
-    if dest_tv.exists():
-        sys.exit('TvMainActivity.kt already exists. Use a clean v1.5 checkout.')
+    if dest_tv.exists() or dest_mouse.exists():
+        sys.exit('TV source already exists. Use a clean v1.5 checkout.')
     for file, content in updates.items():
         file.write_text(content, encoding='utf-8')
     shutil.copy2(here / 'tv_src' / 'TvMainActivity.kt', dest_tv)
+    shutil.copy2(here / 'tv_src' / 'TvRemoteMouse.kt', dest_mouse)
     images = root / 'res' / 'drawable-nodpi'
     images.mkdir(parents=True, exist_ok=True)
     # Generate a compact TV launcher banner at build time.
