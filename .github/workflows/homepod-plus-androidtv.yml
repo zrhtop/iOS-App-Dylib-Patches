@@ -1,0 +1,62 @@
+name: Build HomePod Plus Android TV APK
+
+on:
+  push:
+    branches:
+      - homepod-plus-androidtv
+    paths:
+      - 'homepod-tv/**'
+      - '.github/workflows/homepod-plus-androidtv.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-tv:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout TV adaptation
+        uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Prepare Android SDK and TV resources
+        run: |
+          set -euo pipefail
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+          python3 -m pip install --user Pillow
+      - name: Clone pinned HomePod Plus v1.5
+        run: |
+          git clone --depth 1 --branch v1.5 https://github.com/M-Pennn/HomePod-Plus.git upstream
+          test "$(git -C upstream rev-parse HEAD)" = c7505d43673132741bca74dafc4f25a3b441e21b
+      - name: Apply Android TV modifications
+        run: |
+          python3 -m py_compile homepod-tv/patch_tv.py
+          python3 homepod-tv/patch_tv.py --project upstream
+      - name: Build Android TV debug APK
+        working-directory: upstream
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --no-daemon --stacktrace
+      - name: Validate APK structure and signature
+        run: |
+          set -euo pipefail
+          APK=upstream/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          unzip -t "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | head -35
+          sha256sum "$APK"
+      - name: Upload installable TV APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: HomePodPlus-TV-v1.5-debug-APK
+          path: upstream/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 30
