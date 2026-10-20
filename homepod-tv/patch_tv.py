@@ -50,7 +50,7 @@ def patch_manifest(content: str) -> str:
     content = content.replace('android:name=".HomePodTileService"', 'android:name="com.homepodplus.app.HomePodTileService"')
     content = replace_once(content,
         '        android:label="@string/app_name"',
-        '        android:label="HomePod TV Mouse"\n        android:banner="@drawable/tv_banner"',
+        '        android:label="HomePod 电视遥控"\n        android:banner="@drawable/tv_banner"',
         'TV banner')
     content = replace_once(content,
         '        android:icon="@mipmap/ic_launcher"',
@@ -84,9 +84,9 @@ def patch_gradle(content: str) -> str:
         'applicationId "com.homepodplus.tv.remote"',
         'standalone Android TV application ID')
     content = replace_once(content, 'versionName "1.5.0"',
-        'versionName "1.5.0-tv.3"', 'TV release version')
+        'versionName "1.5.0-tv.4"', 'TV release version')
     content = replace_once(content, 'versionCode 150',
-        'versionCode 153', 'TV cursor release version code')
+        'versionCode 154', 'TV cursor release version code')
     return content
 
 
@@ -216,7 +216,7 @@ def patch_service(content: str) -> str:
                     }''',
         '''                    override fun onStopped(reason: String?) {
                         if (gen != sessionGeneration || stopping) return
-                        CastController.addLog("[${device.name}] connection stopped: $reason")
+                        CastController.addLog("[${device.name}] 连接已断开：$reason")
                         if (isPrimary) s1Started = false else s2Started = false
                         // Retain the authorized MediaProjection, AudioRecord,
                         // wake lock and other speaker while reconnecting.
@@ -252,9 +252,9 @@ def patch_service(content: str) -> str:
             count == 4 -> 12000L
             else -> 30000L
         }
-        val label = if (primary) "primary" else "secondary"
-        CastController.setReconnecting("Reconnecting $label after network loss ($count)")
-        CastController.addLog("$label disconnected: $reason; retrying in ${delayMs}ms")
+        val label = if (primary) "主音箱" else "副音箱"
+        CastController.setReconnecting("$label 网络中断，正在第 $count 次重连")
+        CastController.addLog("$label 断开：$reason，${delayMs} 毫秒后重试")
         uiHandler.post { updateLiveNotification() }
         val generation = sessionGeneration
         reconnectHandler.postDelayed({
@@ -262,7 +262,7 @@ def patch_service(content: str) -> str:
             if (stopping || generation != sessionGeneration || projection == null) return@postDelayed
             val target = if (primary) sender1 else sender2
             if (target != null) {
-                CastController.addLog("Retrying HomePod $label (attempt $count)")
+                CastController.addLog("正在重连 $label（第 $count 次）")
                 target.start()
             }
         }, delayMs)
@@ -275,7 +275,7 @@ def patch_service(content: str) -> str:
         stopForeground(STOP_FOREGROUND_REMOVE)
     }''',
         '''        cleanup()
-        CastController.resetConnection("Stopped by user")
+        CastController.resetConnection("已手动停止投送")
         stopForeground(STOP_FOREGROUND_REMOVE)
     }''',
         'reset state after manual stop')
@@ -368,7 +368,7 @@ def main() -> None:
     banner = Image.new('RGB', (640, 360), (13, 20, 36))
     draw = ImageDraw.Draw(banner)
     draw.rounded_rectangle((40, 55, 600, 305), radius=30, fill=(27, 48, 82), outline=(61, 154, 229), width=4)
-    draw.text((105, 145), "HomePod TV Mouse v3", fill=(235, 246, 255), stroke_width=0)
+    draw.text((105, 145), "HomePod TV CN v4", fill=(235, 246, 255), stroke_width=0)
     banner.save(images / 'tv_banner.png', optimize=True)
     # A visually distinct icon proves which package TV users are opening.
     icon = Image.new('RGBA', (256, 256), (10, 34, 58, 255))
