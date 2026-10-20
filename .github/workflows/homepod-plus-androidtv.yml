@@ -24,13 +24,17 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Set up Python for TV image generation
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
       - name: Prepare Android SDK and TV resources
         run: |
           set -euo pipefail
+          if ! command -v sdkmanager >/dev/null 2>&1; then export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"; fi
+          yes | sdkmanager --licenses > /dev/null || true
           sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-          python3 -m pip install --user Pillow
+          python -m pip install --disable-pip-version-check Pillow
       - name: Clone pinned HomePod Plus v1.5
         run: |
           git clone --depth 1 --branch v1.5 https://github.com/M-Pennn/HomePod-Plus.git upstream
