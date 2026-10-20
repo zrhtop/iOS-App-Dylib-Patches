@@ -55,12 +55,32 @@ jobs:
           test -s "$APK"
           unzip -t "$APK"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose "$APK"
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" | head -35
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" > "$RUNNER_TEMP/tv-badging.txt"
+          grep -E "^(package:|application-label:|launchable-activity:|leanback-launchable-activity:)" "$RUNNER_TEMP/tv-badging.txt"
+          grep -F "package: name='com.homepodplus.tv.remote'" "$RUNNER_TEMP/tv-badging.txt"
+          grep -F "application-label:'HomePod TV Mouse'" "$RUNNER_TEMP/tv-badging.txt"
+          grep -F "launchable-activity: name='com.homepodplus.app.TvMainActivity'" "$RUNNER_TEMP/tv-badging.txt"
+          grep -F "leanback-launchable-activity: name='com.homepodplus.app.TvMainActivity'" "$RUNNER_TEMP/tv-badging.txt"
+          if grep -E "(launchable-activity: name='com.homepodplus.app.MainActivity')" "$RUNNER_TEMP/tv-badging.txt"; then
+            echo "ERROR: original phone activity is still a launcher" >&2
+            exit 1
+          fi
+          python3 - "$APK" <<'PY'
+          import sys
+          from zipfile import ZipFile
+          with ZipFile(sys.argv[1]) as apk:
+              classes = b''.join(apk.read(name) for name in apk.namelist()
+                                 if name.startswith('classes') and name.endswith('.dex'))
+              for symbol in (b'TvRemoteMouse', b'TvMainActivity'):
+                  assert symbol in classes, f'Missing TV cursor code: {symbol!r}'
+              assert 'res/drawable-nodpi/tv_mouse_icon.png' in apk.namelist(), 'Missing unique TV icon'
+              print('Verified TV cursor classes and distinct TV icon inside compiled APK')
+          PY
           sha256sum "$APK"
       - name: Upload installable TV APK
         uses: actions/upload-artifact@v4
         with:
-          name: HomePodPlus-TV-v1.5-debug-APK
+          name: HomePodPlus-TV-v1.5.0-tv.3-Mouse-Verified-APK
           path: upstream/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
