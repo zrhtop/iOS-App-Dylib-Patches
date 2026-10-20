@@ -53,6 +53,10 @@ def patch_manifest(content: str) -> str:
         '        android:label="HomePod TV Mouse"\n        android:banner="@drawable/tv_banner"',
         'TV banner')
     content = replace_once(content,
+        '        android:icon="@mipmap/ic_launcher"',
+        '        android:icon="@drawable/tv_mouse_icon"',
+        'distinct cursor-app icon')
+    content = replace_once(content,
         '        <service\n            android:name="com.homepodplus.app.CastService"',
         '''        <activity
             android:name="com.homepodplus.app.TvMainActivity"
@@ -366,6 +370,18 @@ def main() -> None:
     draw.rounded_rectangle((40, 55, 600, 305), radius=30, fill=(27, 48, 82), outline=(61, 154, 229), width=4)
     draw.text((105, 145), "HomePod TV Mouse v3", fill=(235, 246, 255), stroke_width=0)
     banner.save(images / 'tv_banner.png', optimize=True)
+    # A visually distinct icon proves which package TV users are opening.
+    icon = Image.new('RGBA', (256, 256), (10, 34, 58, 255))
+    icon_draw = ImageDraw.Draw(icon)
+    icon_draw.rounded_rectangle((12, 12, 244, 244), radius=55,
+        fill=(5, 112, 150, 255), outline=(135, 239, 255, 255), width=9)
+    icon_draw.polygon([(65, 42), (77, 206), (118, 160),
+                       (145, 225), (173, 211), (146, 147), (208, 143)],
+        fill=(255, 255, 255, 255))
+    icon_draw.line([(65, 42), (77, 206), (118, 160), (145, 225),
+                    (173, 211), (146, 147), (208, 143), (65, 42)],
+        fill=(6, 31, 55, 255), width=6, joint='curve')
+    icon.save(images / 'tv_mouse_icon.png', optimize=True)
     print('Android TV source patch applied. Build with ./gradlew :app:assembleDebug')
     print('APK: app/build/outputs/apk/debug/app-debug.apk')
 
