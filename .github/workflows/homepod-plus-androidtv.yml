@@ -73,7 +73,9 @@ jobs:
                                  if name.startswith('classes') and name.endswith('.dex'))
               for symbol in (b'TvRemoteMouse', b'TvMainActivity'):
                   assert symbol in classes, f'Missing TV cursor code: {symbol!r}'
-              assert 'res/drawable-nodpi/tv_mouse_icon.png' in apk.namelist(), 'Missing unique TV icon'
+              assert any(name.startswith('res/drawable-nodpi') and
+                         name.endswith('/tv_mouse_icon.png')
+                         for name in apk.namelist()), 'Missing unique TV icon'
               print('Verified TV cursor classes and distinct TV icon inside compiled APK')
           PY
           sha256sum "$APK"
