@@ -43,6 +43,10 @@ jobs:
         run: |
           python3 -m py_compile homepod-tv/patch_tv.py
           python3 homepod-tv/patch_tv.py --project upstream
+          python3 -m py_compile homepod-tv/fix_nsd.py
+          python3 homepod-tv/fix_nsd.py --project upstream
+          grep -F 'private fun resolveNextNsd()' upstream/app/src/main/java/com/homepodplus/app/airplay/MdnsDiscoverer.kt
+          grep -F 'HomePod 电视遥控版' upstream/app/src/main/java/com/homepodplus/app/TvMainActivity.kt
       - name: Build Android TV debug APK
         working-directory: upstream
         run: |
@@ -58,7 +62,7 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" > "$RUNNER_TEMP/tv-badging.txt"
           grep -E "^(package:|application-label:|launchable-activity:|leanback-launchable-activity:)" "$RUNNER_TEMP/tv-badging.txt"
           grep -F "package: name='com.homepodplus.tv.remote'" "$RUNNER_TEMP/tv-badging.txt"
-          grep -F "application-label:'HomePod TV Mouse'" "$RUNNER_TEMP/tv-badging.txt"
+          grep -F "application-label:'HomePod 电视遥控'" "$RUNNER_TEMP/tv-badging.txt"
           grep -F "launchable-activity: name='com.homepodplus.app.TvMainActivity'" "$RUNNER_TEMP/tv-badging.txt"
           grep -F "leanback-launchable-activity: name='com.homepodplus.app.TvMainActivity'" "$RUNNER_TEMP/tv-badging.txt"
           if grep -E "(launchable-activity: name='com.homepodplus.app.MainActivity')" "$RUNNER_TEMP/tv-badging.txt"; then
@@ -71,7 +75,8 @@ jobs:
           with ZipFile(sys.argv[1]) as apk:
               classes = b''.join(apk.read(name) for name in apk.namelist()
                                  if name.startswith('classes') and name.endswith('.dex'))
-              for symbol in (b'TvRemoteMouse', b'TvMainActivity'):
+              for symbol in (b'TvRemoteMouse', b'TvMainActivity',
+                             b'nsdResolveQueue', b'resolveNextNsd'):
                   assert symbol in classes, f'Missing TV cursor code: {symbol!r}'
               assert any(name.startswith('res/drawable-nodpi') and
                          name.endswith('/tv_mouse_icon.png')
@@ -82,7 +87,7 @@ jobs:
       - name: Upload installable TV APK
         uses: actions/upload-artifact@v4
         with:
-          name: HomePodPlus-TV-v1.5.0-tv.3-Mouse-Verified-APK
+          name: HomePod-TV-v1.5.0-tv.4-CN-NSD-Fix-APK
           path: upstream/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
