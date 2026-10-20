@@ -2,9 +2,9 @@
 
 源代码：[HomePod Plus v1.5](https://github.com/M-Pennn/HomePod-Plus/releases/tag/v1.5)
 
-[Android TV 移植代码](https://github.com/zrhtop/iOS-App-Dylib-Patches/tree/homepod-plus-androidtv) | [已成功的构建记录](https://github.com/zrhtop/iOS-App-Dylib-Patches/actions/runs/39375162264)
+[Android TV 移植代码](https://github.com/zrhtop/iOS-App-Dylib-Patches/tree/homepod-plus-androidtv) | [已成功的构建记录](https://github.com/zrhtop/iOS-App-Dylib-Patches/actions/runs/39376738250)
 
-**版本**：`1.5.0-tv.1`  **包名**：`com.homepodplus.tv`  **最低 Android 版本**：10（API 29）
+**版本**：`1.5.0-tv.2`  **包名**：`com.homepodplus.tv`  **最低 Android 版本**：10（API 29）
 
 ## 安装
 
@@ -14,7 +14,11 @@
 adb install -r app-debug.apk
 ```
 
-安装后从电视启动器打开 HomePod +。使用遥控器方向键选择，确认键操作。需要用户同意录音权限和系统投屏授权，才能捕获允许被捕获的应用音频。
+安装后从电视启动器打开 HomePod +。v1.5.0-tv.2 加入应用内可见虚拟鼠标：方向键移动光标，长按方向键连续移动并加速，遥控器 OK/确认键模拟鼠标左键单击。页面上下边缘可自动滚动，频道/翻页键也可翻页。返回键、Home 键、音量键保持 Android 原有功能。手动添加音箱的输入弹窗也具有虚拟鼠标。
+
+需要用户同意录音权限和系统投屏授权，才能捕获允许被捕获的应用音频。Android 自己的授权窗口不受应用内虚拟鼠标控制，请使用系统原生遥控焦点导航。
+
+**升级注意：** 各次 GitHub Actions Debug APK 可能使用不同的调试签名。如果直接覆盖安装出现 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`，请先卸载旧版再安装新 APK；卸载会清除应用内保存的 IP 和投送配置，请先记下这些设置。
 
 ## 主要功能
 
@@ -36,10 +40,10 @@ adb install -r app-debug.apk
 
 ## APK 完整性校验
 
-GitHub Actions 构建 #39375162264
+GitHub Actions 构建 #39376738250
 
 `app-debug.apk` SHA-256：
 
 ```
-887a2f8e6d56b0c5f160c5175eb8d733071425bc80abe02dcc11880b4433f4d0
+c8902ca80c40623e01b713d22e4f564f003ef9af0a538c96db1dd5aafd72f3bf
 ```
