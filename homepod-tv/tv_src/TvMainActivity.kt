@@ -47,6 +47,8 @@ class TvMainActivity : ComponentActivity() {
     private val soft = Color.rgb(185, 203, 224)
 
     private var pendingDevice: AirplayDevice? = null
+    private var tvRemoteMouse: TvRemoteMouse? = null
+    private var mainScroll: ScrollView? = null
     private var pendingDual = false
     private lateinit var deviceList: LinearLayout
     private lateinit var statusLabel: TextView
@@ -103,6 +105,10 @@ class TvMainActivity : ComponentActivity() {
         CastController.loadManual(applicationContext)
         askForOptionalPermissions()
         buildScreen()
+        tvRemoteMouse = TvRemoteMouse(window, mainScroll).also {
+            it.attach()
+            it.resume()
+        }
         lifecycleScope.launch {
             CastController.state.collect { state -> refresh(state) }
         }
@@ -110,14 +116,29 @@ class TvMainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart()
+        tvRemoteMouse?.resume()
         CastController.startDiscovery(applicationContext)
     }
 
     override fun onStop() {
+        tvRemoteMouse?.pause()
         // Do not leave the multicast scanner consuming CPU/network resources
         // while another Android TV app is producing captured audio.
         CastController.stopDiscovery()
         super.onStop()
+    }
+
+    override fun onDestroy() {
+        tvRemoteMouse?.close()
+        tvRemoteMouse = null
+        super.onDestroy()
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // The visual pointer consumes only D-pad, OK and page/channel keys.
+        // Back, Home, volume and keyboard entry retain Android semantics.
+        if (tvRemoteMouse?.handle(event) == true) return true
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -201,6 +222,7 @@ class TvMainActivity : ComponentActivity() {
             setPadding(dp(55), dp(32), dp(55), dp(60))
         }
         scroll.addView(body, ViewGroup.LayoutParams(-1, -2))
+        mainScroll = scroll
         setContentView(scroll)
 
         body.addView(text("HomePod +   |   Android TV", 33f, white, true))
@@ -408,6 +430,15 @@ class TvMainActivity : ComponentActivity() {
                     name.requestFocus()
                 }
                 show()
+                // Dialogs own separate Android windows. Provide the same
+                // D-pad mouse here so Save, Cancel and EditText are clickable.
+                val dialogPointer = window?.let { TvRemoteMouse(it) }
+                dialogPointer?.attach()
+                dialogPointer?.resume()
+                setOnKeyListener { _, _, keyEvent ->
+                    dialogPointer?.handle(keyEvent) == true
+                }
+                setOnDismissListener { dialogPointer?.close() }
             }
     }
 
