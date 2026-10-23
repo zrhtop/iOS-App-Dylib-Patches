@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0c1528">
+  <meta name="description" content="ZZS IPA Store · AltStore Classic source manager">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' https: data:; connect-src 'self' https://api.github.com; base-uri 'none'; object-src 'none'; form-action 'none'">
+  <title>ZZS IPA Store · 管理控制台</title>
+  <link rel="stylesheet" href="./style.css">
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="./"><span class="brand-mark">Z</span><span><strong>ZZS IPA Store</strong><small>ALTSTORE CLASSIC</small></span></a>
+      <div class="nav-label">工作台</div>
+      <nav class="nav">
+        <button class="nav-item active" type="button" data-tab="dashboard"><span class="nav-icon">▦</span>应用总览</button>
+        <button class="nav-item" type="button" data-tab="source"><span class="nav-icon">◈</span>软件源设置</button>
+        <button class="nav-item" type="button" data-tab="guide"><span class="nav-icon">☷</span>使用说明</button>
+      </nav>
+      <div class="sidebar-end"><span class="connection-light" id="connectionLight"></span><span id="connectionLabel">只读模式</span><button class="link-btn" id="signOut" hidden>退出</button></div>
+      <div class="sidebar-meta">本控制台是静态网页。授权信息仅保存在当前页面内存中，刷新即清除。</div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div><span class="eyebrow">PERSONAL APP REPOSITORY</span><h1 id="pageTitle">应用总览</h1></div>
+        <div class="top-actions"><button class="btn subtle" id="refreshBtn">↻ <span>刷新</span></button><button class="btn primary" id="loginBtn">连接 GitHub</button></div>
+      </header>
+      <div id="toast" role="status" aria-live="polite" hidden></div>
+      <section id="dashboard" class="panel">
+        <div class="hero">
+          <div><div class="hero-label">你的专属 AltStore Classic 软件源</div><h2>管理应用，发布版本。<br>所有内容由你掌控。</h2><p>通过 GitHub 托管 IPA 和公开的软件源。添加或编辑后，更新会自动写入 source.json。</p><div class="hero-buttons"><button class="btn light" id="addBtn">＋ 添加 IPA / 新版本</button><a class="btn ghost-light" href="https://github.com/zrhtop/iOS-App-Dylib-Patches/releases/new" target="_blank" rel="noopener noreferrer">大文件上传 ↗</a></div></div>
+          <div class="hero-orbit" aria-hidden="true"><div class="hero-core">IPA</div><span class="orbit a"></span><span class="orbit b"></span><span class="orbit c"></span></div>
+        </div>
+        <div class="stats">
+          <article class="stat"><span>应用数量</span><strong id="appCount">0</strong><small>已发布的应用</small></article>
+          <article class="stat"><span>版本总数</span><strong id="versionCount">0</strong><small>可用历史版本</small></article>
+          <article class="stat"><span>软件源状态</span><strong class="stat-status" id="sourceStatus">检测中</strong><small id="lastUpdated">等待连接</small></article>
+        </div>
+        <div class="section-head"><div><h2>应用列表</h2><p>点击应用可修改资料、管理版本或更换下载链接。</p></div><button class="btn outline" id="addBtnSmall">＋ 添加应用</button></div>
+        <div id="appList" class="app-list"></div>
+      </section>
+      <section id="source" class="panel" hidden>
+        <div class="section-head"><div><h2>软件源设置</h2><p>修改对外展示的名称、描述和颜色。</p></div></div>
+        <form id="sourceForm" class="form-card">
+          <div class="field-grid"><label>软件源名称 <input name="name" required maxlength="80"></label><label>副标题 <input name="subtitle" maxlength="150"></label></div>
+          <label>完整描述 <textarea name="description" rows="3"></textarea></label>
+          <div class="field-grid"><label>官网 URL <input type="url" name="website" placeholder="https://zrh.jp"></label><label>图标 URL <input type="url" name="iconURL" placeholder="https://example.com/icon.png"></label></div>
+          <label>主题色 <input name="tintColor" type="color" value="#5969ef"></label>
+          <button class="btn primary" type="submit">保存并更新 source.json</button>
+        </form>
+        <div class="form-card top-gap"><div class="section-head"><h3>软件源 URL</h3><button class="btn outline" id="copySourceBtn">复制链接</button></div><code class="source-link" id="sourceLink">https://zrhtop.github.io/iOS-App-Dylib-Patches/source.json</code><p class="muted">在 GitHub 仓库 Settings → Pages 选择 main /docs 后才会对外发布。</p></div>
+      </section>
+      <section id="guide" class="panel" hidden>
+        <div class="section-head"><div><h2>使用说明</h2><p>第一次设置只需几步。</p></div></div>
+        <div class="guide"><div><span class="step">01</span><h3>开启 GitHub Pages</h3><p>前往仓库 Settings → Pages → Deploy from a branch，选择 main 和 /docs 并保存。</p><a href="https://github.com/zrhtop/iOS-App-Dylib-Patches/settings/pages" target="_blank" rel="noopener noreferrer">打开 Pages 设置 ↗</a></div><div><span class="step">02</span><h3>创建最小权限访问令牌</h3><p>在 GitHub Fine-grained tokens 中，只选择本仓库，授予 Contents: Read and write。不要给其他仓库授权。</p><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">创建访问令牌 ↗</a></div><div><span class="step">03</span><h3>连接并添加 IPA</h3><p>网页只在本次会话使用令牌。可上传较小 IPA；较大 IPA 请先发布到本仓库 Releases，再使用其公开下载链接。</p></div><div><span class="step">04</span><h3>添加到 AltStore</h3><p>在 AltStore Classic 的 Sources 页面点击 +，粘贴软件源 URL。新版本排在第一位，AltStore 才会优先识别更新。</p></div></div>
+        <div class="notice"><strong>安全提醒</strong><p>公开仓库中的 IPA 和软件源任何人都可以访问。本页面不能提供私有下载。请仅发布你有权分发的 IPA，勿上传含账号、设备标识或私有证书的文件。</p></div>
+      </section>
+      <footer>ZZS IPA Store · GitHub Pages + GitHub Contents API · <a href="https://github.com/zrhtop/iOS-App-Dylib-Patches" target="_blank" rel="noopener noreferrer">GitHub 仓库 ↗</a></footer>
+    </main>
+  </div>
+
+  <dialog id="editorDialog">
+    <form id="editorForm">
+      <div class="dialog-header"><div><div class="eyebrow" id="dialogEyebrow">NEW RELEASE</div><h2 id="dialogTitle">添加 IPA / 版本</h2></div><button type="button" class="icon-button" id="closeDialog" aria-label="关闭">✕</button></div>
+      <div class="dialog-content">
+        <div class="upload-card"><label class="file-button" for="ipaFile">⬆ <strong>选择本地 IPA</strong><small>最大 80 MiB。超过限制请使用 GitHub Releases，并在下方粘贴下载地址。</small></label><input id="ipaFile" type="file" accept=".ipa,application/octet-stream"><div id="ipaHint" class="muted">尚未选择文件</div></div>
+        <label>或使用现有 IPA HTTPS 地址 <input id="f-url" type="url" placeholder="https://github.com/.../releases/download/.../app.ipa"></label>
+        <div class="field-grid"><label>应用名称 * <input id="f-name" required></label><label>Bundle ID * <input id="f-bundle" required placeholder="com.example.app"></label></div>
+        <div class="field-grid"><label>版本号 * <input id="f-version" required placeholder="1.0.0"></label><label>Build 版本 * <input id="f-build" required placeholder="100"></label></div>
+        <div class="field-grid"><label>开发者名称 * <input id="f-dev" required value="ZZS"></label><label>应用分类 <select id="f-category"><option value="utilities">工具</option><option value="developer">开发者</option><option value="entertainment">娱乐</option><option value="games">游戏</option><option value="lifestyle">生活</option><option value="photo-video">照片和视频</option><option value="social">社交</option><option value="other">其他</option></select></label></div>
+        <div class="field-grid"><label>发布日期 <input id="f-date" type="date"></label><label>文件大小（字节） * <input id="f-size" type="number" min="1" required placeholder="文件选择后自动填写"></label></div>
+        <label>图标 URL <input id="f-icon" type="url" placeholder="https://example.com/app-icon.png"></label>
+        <label>应用描述 <textarea id="f-description" rows="2" placeholder="简单介绍应用"></textarea></label>
+        <label>此版本更新内容 <textarea id="f-notes" rows="2" placeholder="修复了问题，改善了体验"></textarea></label>
+        <details><summary>高级：权限和系统版本</summary><div class="advanced-fields"><label>Entitlements（每行一个） <textarea id="f-entitlements" rows="3" placeholder="com.apple.security.application-groups"></textarea></label><label>隐私权限 JSON（来自 Info.plist，可修改） <textarea id="f-privacy" rows="3" placeholder='{"NSCameraUsageDescription":"..."}'></textarea></label><div class="field-grid"><label>最低 iOS 版本 <input id="f-minos" placeholder="15.0"></label><label>最高 iOS 版本 <input id="f-maxos" placeholder="可留空"></label></div></div></details>
+        <div class="muted" id="saveHint">IPA 信息会尽量自动识别；签名权限需根据 IPA 核对。</div>
+      </div>
+      <div class="dialog-actions"><button type="button" class="btn subtle" id="cancelDialog">取消</button><button type="submit" class="btn primary" id="saveAppBtn">上传并发布</button></div>
+    </form>
+  </dialog>
+</body>
+</html>
