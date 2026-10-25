@@ -37,6 +37,22 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/patch-nmhda-diagnostics.py upstream/kexts/NMHDA/nmhda.cpp
+          # Extend the upstream userspace fixture with the hardware PCI access
+          # used only by our read-only instrumentation.
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('upstream/tools/test_nmhda_native_id.py')
+          s = p.read_text()
+          needle = 'struct IOPCIDevice : IOService {};'
+          replacement = ('struct IOPCIDevice : IOService {'
+                         ' uint16_t extendedConfigRead16(uint64_t off) {'
+                         ' if (off == 0) return 0x10DE;'
+                         ' if (off == 2) return 0x22BD;'
+                         ' return 0;'
+                         ' } };')
+          assert s.count(needle) == 1
+          p.write_text(s.replace(needle, replacement, 1))
+          PY
           python3 upstream/tools/test_nmhda_native_id.py
       - name: Compile x86_64 NMHDA kernel extension
         shell: bash
