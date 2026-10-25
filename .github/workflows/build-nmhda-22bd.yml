@@ -85,6 +85,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 scripts/patch-nmhda-hdau.py upstream/kexts/NMHDA/nmhda.cpp
+          python3 scripts/patch-nmhda-table-check.py upstream/kexts/NMHDA/nmhda.cpp
           LILU="$(find "$PWD/LiluExtract" -name Lilu.kext -type d | head -n 1)"
           test -n "$LILU"
           bash upstream/kexts/NMHDA/build.sh "$LILU" "$PWD/MacKernelSDK" "$PWD/build-hdau"
@@ -96,7 +97,7 @@ jobs:
           codesign --verify --strict --verbose=2 build-hdau/NMHDA.kext
           cat > build-hdau/BUILD-INFO.txt <<'EOF'
           EXPERIMENTAL: NMHDA for NVIDIA RTX 4060 Ti controller 10DE:22BD
-          Variant: HDAU name/compatible repair plus read-only probe diagnostics
+          Variant: HDAU name/compatible repair, PCI config and bounded controller-table diagnostics
           Based on: official nullmoth NMHDA at 4e49db269fcf701a94e141adf9cb0a550eab1243
           Lilu implementation: WIOKit::renameDevice(provider, "HDAU") before original AppleHDAController probe
           Does not force probe success or change the card's PCI device ID.
