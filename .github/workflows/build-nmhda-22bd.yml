@@ -14,6 +14,7 @@ jobs:
     runs-on: macos-15-intel
     timeout-minutes: 30
     steps:
+      - uses: actions/checkout@v4
       - name: Record build environment
         run: |
           sw_vers
@@ -31,6 +32,12 @@ jobs:
           unzip -q Lilu-DEBUG.zip -d LiluExtract
           find LiluExtract -name Lilu.kext -type d -print
           find MacKernelSDK/Library -maxdepth 2 -type f -print
+      - name: Add read-only probe diagnostics and run upstream tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/patch-nmhda-diagnostics.py upstream/kexts/NMHDA/nmhda.cpp
+          python3 upstream/tools/test_nmhda_native_id.py
       - name: Compile x86_64 NMHDA kernel extension
         shell: bash
         run: |
@@ -55,15 +62,16 @@ jobs:
           Source: 4e49db269fcf701a94e141adf9cb0a550eab1243
           Lilu SDK: 1.7.2 DEBUG
           MacKernelSDK: 3f750085caa17ec3a7880f11c11bf4f48cd6a164
+          Instrumentation: logging only (no forced probe, no PCI ID spoof)
           Hardware-tested: NO
           Replace the existing NMHDA.kext; do not load both.
           Only deploy to a recovery-capable test EFI, not the known-good EFI.
           EOF
           shasum -a 256 build/NMHDA.kext/Contents/MacOS/NMHDA > build/NMHDA-SHA256.txt
-      - name: Upload unsigned development test kext
+      - name: Upload ad-hoc-signed diagnostic test kext
         uses: actions/upload-artifact@v4
         with:
-          name: NMHDA-10DE-22BD-experimental
+          name: NMHDA-10DE-22BD-diagnostic
           path: |
             build/NMHDA.kext
             build/BUILD-INFO.txt
