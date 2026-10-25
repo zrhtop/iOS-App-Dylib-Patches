@@ -77,3 +77,38 @@ jobs:
             build/BUILD-INFO.txt
             build/NMHDA-SHA256.txt
           retention-days: 7
+
+      - name: Build HDAU renaming experimental variant
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/patch-nmhda-hdau.py upstream/kexts/NMHDA/nmhda.cpp
+          LILU="$(find "$PWD/LiluExtract" -name Lilu.kext -type d | head -n 1)"
+          test -n "$LILU"
+          bash upstream/kexts/NMHDA/build.sh "$LILU" "$PWD/MacKernelSDK" "$PWD/build-hdau"
+          test -f build-hdau/NMHDA.kext/Contents/MacOS/NMHDA
+          file build-hdau/NMHDA.kext/Contents/MacOS/NMHDA
+          xcrun lipo -archs build-hdau/NMHDA.kext/Contents/MacOS/NMHDA | grep -q x86_64
+          plutil -lint build-hdau/NMHDA.kext/Contents/Info.plist
+          codesign --force --sign - --deep build-hdau/NMHDA.kext
+          codesign --verify --strict --verbose=2 build-hdau/NMHDA.kext
+          cat > build-hdau/BUILD-INFO.txt <<'EOF'
+          EXPERIMENTAL: NMHDA for NVIDIA RTX 4060 Ti controller 10DE:22BD
+          Variant: HDAU name/compatible repair plus read-only probe diagnostics
+          Based on: official nullmoth NMHDA at 4e49db269fcf701a94e141adf9cb0a550eab1243
+          Lilu implementation: WIOKit::renameDevice(provider, "HDAU") before original AppleHDAController probe
+          Does not force probe success or change the card's PCI device ID.
+          Hardware-tested: NO. Kernel crash or startup failure are possible.
+          CAUTION: Only test on a recoverable EFI; retain known-good USB EFI.
+          Deploy exactly one NMHDA.kext, never two with the same bundle identifier.
+          EOF
+          shasum -a 256 build-hdau/NMHDA.kext/Contents/MacOS/NMHDA > build-hdau/NMHDA-SHA256.txt
+      - name: Upload HDAU naming experiment
+        uses: actions/upload-artifact@v4
+        with:
+          name: NMHDA-10DE-22BD-HDAU-rename
+          path: |
+            build-hdau/NMHDA.kext
+            build-hdau/BUILD-INFO.txt
+            build-hdau/NMHDA-SHA256.txt
+          retention-days: 7
