@@ -26,6 +26,15 @@ end = src.index(end_marker)
 replacement = r'''static IOService *wrapProbe(IOService *self, IOService *provider, SInt32 *score) {
     const bool isNv = isNvidiaAudio(provider);
     if (isNv) {
+        auto pci = OSDynamicCast(IOPCIDevice, provider);
+        // Read the physical PCI configuration registers used by AppleHDAController::probe().
+        // IORegistry's OSData device-id alone does not establish the value read by probe.
+        if (pci)
+            report("diag", "PCI config: vendor=%04X device=%04X (IORegistry=%04X:%04X)",
+                   (unsigned)pci->extendedConfigRead16(0),
+                   (unsigned)pci->extendedConfigRead16(2),
+                   (unsigned)(readU32(provider, "vendor-id") & 0xFFFF),
+                   (unsigned)(readU32(provider, "device-id") & 0xFFFF));
         auto before = OSDynamicCast(OSArray, self->getProperty("HwFactoryPrefixTranslation"));
         report("diag", "pre: v=%04X d=%04X rev=%04X sub=%04X layout=%08X gfx=%u trs=%u",
                (unsigned)(readU32(provider, "vendor-id") & 0xFFFF),
