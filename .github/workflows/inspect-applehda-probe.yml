@@ -1,0 +1,67 @@
+name: Inspect AppleHDAController 600.2 probe
+
+on:
+  push:
+    branches:
+      - hackintosh/nmhda-22bd-build
+    paths:
+      - .github/workflows/inspect-applehda-probe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  disassemble:
+    runs-on: macos-15-intel
+    timeout-minutes: 15
+    steps:
+      - name: Download known AppleHDA 600.2 binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --output AppleHDA.kext.zip https://github.com/Mirone/MyKextInstaller/releases/download/1.9/AppleHDA.kext.zip
+          mkdir -p extracted
+          unzip -q AppleHDA.kext.zip -d extracted
+          find extracted -name AppleHDAController -type f -print
+          find extracted -name AppleHDAController -type f -exec file {} \;
+      - name: Disassemble AppleHDAController probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p analysis
+          BIN="$(find "$PWD/extracted" -name AppleHDAController -type f | head -n 1)"
+          test -n "$BIN"
+          xcrun nm -a "$BIN" > analysis/symbols.txt
+          grep 'AppleHDAController5probe' analysis/symbols.txt || true
+          xcrun llvm-objdump --macho --disassemble --demangle --symbolize-operands "$BIN" > analysis/full-disassembly.txt
+          python3 - "$BIN" <<'PY'
+          import re, sys, pathlib
+          text=pathlib.Path('analysis/full-disassembly.txt').read_text(errors='replace')
+          lines=text.splitlines()
+          positions=[i for i,line in enumerate(lines) if 'AppleHDAController::probe(' in line or 'AppleHDAController5probe' in line]
+          blocks=[]
+          for i in positions:
+              if lines[i].strip().endswith(':'):
+                  blocks.append(i)
+          print('probe symbol lines', len(positions),'function starts',len(blocks))
+          output=[]
+          for start in blocks[:8]:
+              end=start+1
+              while end<len(lines):
+                  line=lines[end]
+                  if line and not line[0].isspace() and line.rstrip().endswith(':'):
+                      break
+                  end+=1
+                  if end-start>1200: break
+              output += ['---'+str(start)+' '+lines[start]+'---']+lines[start:end]
+          pathlib.Path('analysis/probe-disassembly.txt').write_text('\n'.join(output))
+          print('\n'.join(output[:450]))
+          PY
+          wc -c analysis/*
+      - name: Upload analysis output
+        uses: actions/upload-artifact@v4
+        with:
+          name: AppleHDAController-probe-600.2-disassembly
+          path: analysis/
+          retention-days: 3
