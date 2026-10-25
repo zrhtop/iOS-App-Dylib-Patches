@@ -1,0 +1,71 @@
+name: NMHDA RTX 4060 Ti (10DE-22BD) build
+
+on:
+  push:
+    branches:
+      - hackintosh/nmhda-22bd-build
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    steps:
+      - name: Record build environment
+        run: |
+          sw_vers
+          xcodebuild -version
+          uname -m
+      - name: Download pinned official NMHDA source and SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone -q https://github.com/nullmoth/nvidia-macos-driver.git upstream
+          git -C upstream checkout -q 4e49db269fcf701a94e141adf9cb0a550eab1243
+          git clone -q https://github.com/acidanthera/MacKernelSDK.git MacKernelSDK
+          git -C MacKernelSDK checkout -q 3f750085caa17ec3a7880f11c11bf4f48cd6a164
+          curl --fail --location --retry 3 -o Lilu-DEBUG.zip https://github.com/acidanthera/Lilu/releases/download/1.7.2/Lilu-1.7.2-DEBUG.zip
+          unzip -q Lilu-DEBUG.zip -d LiluExtract
+          find LiluExtract -name Lilu.kext -type d -print
+          find MacKernelSDK/Library -maxdepth 2 -type f -print
+      - name: Compile x86_64 NMHDA kernel extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          LILU="$(find "$PWD/LiluExtract" -name Lilu.kext -type d | head -n 1)"
+          test -n "$LILU"
+          bash upstream/kexts/NMHDA/build.sh "$LILU" "$PWD/MacKernelSDK" "$PWD/build"
+      - name: Verify kernel extension
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f build/NMHDA.kext/Contents/MacOS/NMHDA
+          test -f build/NMHDA.kext/Contents/Info.plist
+          file build/NMHDA.kext/Contents/MacOS/NMHDA
+          xcrun lipo -archs build/NMHDA.kext/Contents/MacOS/NMHDA | grep -q x86_64
+          plutil -lint build/NMHDA.kext/Contents/Info.plist
+          codesign --force --sign - --deep build/NMHDA.kext
+          codesign --verify --strict --verbose=2 build/NMHDA.kext
+          cat > build/BUILD-INFO.txt <<'EOF'
+          EXPERIMENTAL: NMHDA for RTX 4060 Ti HD Audio controller 10DE:22BD
+          Upstream: nullmoth/nvidia-macos-driver
+          Source: 4e49db269fcf701a94e141adf9cb0a550eab1243
+          Lilu SDK: 1.7.2 DEBUG
+          MacKernelSDK: 3f750085caa17ec3a7880f11c11bf4f48cd6a164
+          Hardware-tested: NO
+          Replace the existing NMHDA.kext; do not load both.
+          Only deploy to a recovery-capable test EFI, not the known-good EFI.
+          EOF
+          shasum -a 256 build/NMHDA.kext/Contents/MacOS/NMHDA > build/NMHDA-SHA256.txt
+      - name: Upload unsigned development test kext
+        uses: actions/upload-artifact@v4
+        with:
+          name: NMHDA-10DE-22BD-experimental
+          path: |
+            build/NMHDA.kext
+            build/BUILD-INFO.txt
+            build/NMHDA-SHA256.txt
+          retention-days: 7
