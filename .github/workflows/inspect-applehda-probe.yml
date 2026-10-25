@@ -56,7 +56,13 @@ jobs:
                   if end-start>1200: break
               output += ['---'+str(start)+' '+lines[start]+'---']+lines[start:end]
           pathlib.Path('analysis/probe-disassembly.txt').write_text('\n'.join(output))
-          print('\n'.join(output[:450]))
+          print('\n'.join(output[:80]))
+          print('=== TARGETED PROBE CONTROL FLOW 0x2590..0x2945 ===')
+          for line in output:
+              m=re.match(r'^\\s*([0-9a-f]{4}):',line)
+              if m and 0x2590<=int(m.group(1),16)<=0x2945:
+                  print(line)
+          print('=== END TARGETED PROBE CONTROL FLOW ===')
           PY
           wc -c analysis/*
       - name: Upload analysis output
