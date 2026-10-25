@@ -59,7 +59,7 @@ jobs:
           print('\n'.join(output[:80]))
           print('=== TARGETED PROBE CONTROL FLOW 0x2590..0x2945 ===')
           for line in output:
-              m=re.match(r'^\\s*([0-9a-f]{4}):',line)
+              m=re.match(r'^\s*([0-9a-f]{4}):',line)
               if m and 0x2590<=int(m.group(1),16)<=0x2945:
                   print(line)
           print('=== END TARGETED PROBE CONTROL FLOW ===')
